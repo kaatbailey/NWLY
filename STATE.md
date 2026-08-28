@@ -139,6 +139,7 @@ Proton — record which once T3/H1 establish the working setup.
 | Client build under test     | `<record exact version + kept installer>` |
 | Retail client binary        | `<path>`                              |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, stock fork of aws/lumberyard, `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
+| Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M) |
 | Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
 | Ghidra project              | `<path>`                              |
