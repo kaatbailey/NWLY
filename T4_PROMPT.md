@@ -39,6 +39,17 @@ instrument the whole project leans on (CHARTER §2).
   Linux, add these `-I` dirs:
   - `dev/Code/Framework/AzCore/Platform/Linux`
   - `dev/Code/Framework/GridMate/Tests/Platform/Linux` (only if using the harness)
+- **OpenSSL 3.x is NOT a blocker — this was checked and the worry was wrong.**
+  `SecureSocketDriver.cpp` targets the 1.1.0+ API era (it uses
+  `X509_get0_notBefore` and `BIO_s_mem`, and carries no version guards). It
+  compiles against OpenSSL 3.x with **0 errors and 3 deprecation warnings**
+  (`DTLSv1_2_method`, `ERR_load_BIO_strings`, `ERR_load_SSL_strings`). Add
+  `-Wno-deprecated-declarations` at step 5. Do **not** provision an
+  `openssl-1.1` compat package, and do not spend time writing a shim. The
+  pinned cipher `ECDHE-RSA-AES256-GCM-SHA384` and the RSA-4096 / SHA-384 test
+  cert both clear modern security-level policy. See STATE §7 and test-log #1–3.
+  Confirm with `clang++ -std=c++14 -c t4_openssl_probe.cpp -o /dev/null`
+  before step 5; that is the entire check.
 - **Test certs exist:** `dev/Code/Framework/GridMate/Tests/Certificates.cpp` defines
   `g_untrustedCertPEM` / `g_untrustedPrivateKeyPEM`. Compile that file to resolve the
   `extern`s DTLS needs.
@@ -79,8 +90,11 @@ tests. Satisfy the whole `Tests.h` chain plus both Linux `-I` dirs above.
    message. Capture on the wire with Wireshark. This is a clean cleartext reference
    handshake — the thing T5 diffs the retail client against.
 5. **DTLS Carrier test.** Define the secure trait, swap in `SecureSocketDriver` with
-   `Certificates.cpp`, link OpenSSL. Confirm the handshake completes and the wire
-   traffic is now encrypted. Expect Linux-path bugs here (see above).
+   `Certificates.cpp`, link OpenSSL (`-lssl -lcrypto`) and add
+   `-Wno-deprecated-declarations`. Confirm the handshake completes and the wire
+   traffic is now encrypted. The OpenSSL *version* question is settled (see
+   above) — so any failure here is a GridMate-on-Linux bug, not a crypto-library
+   mismatch. Do not go looking for the latter. Expect Linux-path bugs (see above).
 
 ### Definition of done
 

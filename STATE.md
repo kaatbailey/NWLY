@@ -143,6 +143,7 @@ Proton — record which once T3/H1 establish the working setup.
 | Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M) |
 | Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
+| Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Probe result below. |
 | Ghidra project              | `<path>`                              |
 | Capture output              | `<path>`                              |
 
@@ -163,7 +164,13 @@ Gotchas found so far:
 
 ## 6. What already exists — do not rebuild
 
-Nothing yet. This section fills as chunks complete. Each completed chunk's
+**`t4_openssl_probe.cpp`** (repo root) — a single translation unit reproducing
+every OpenSSL call site in `SecureSocketDriver.cpp` at fork commit `413ecaf`.
+Compile it to answer "does the local OpenSSL match the API era this source
+assumes" in one step. Build line is in its header comment. Re-run it after any
+OpenSSL major upgrade; that is the whole point of keeping it.
+
+Otherwise nothing yet. This section fills as chunks complete. Each completed chunk's
 FINDINGS block folds into the relevant section here.
 
 ---
@@ -240,6 +247,44 @@ first milestone.
 
 ---
 
+### The source targets the OpenSSL 1.1.0+ API era, not 1.0.2
+
+Established by probe (test-log #1/#2). `SecureSocketDriver.cpp` contains **no**
+`OPENSSL_VERSION_NUMBER` guards anywhere — it targets exactly one API era, and
+that era is 1.1.0 or later. Two tells in the source: it calls
+`X509_get0_notBefore` / `X509_get0_notAfter` (accessors that only exist from
+1.1.0), and it builds its BIOs with `BIO_s_mem` rather than statically
+initialising a `BIO_METHOD` struct — so the single largest 1.1.0 breaking
+change is simply not present in this file.
+
+**Consequence for T4 step 5:** modern OpenSSL needs no shim and no
+`openssl-1.1` compat package. Add `-Wno-deprecated-declarations` and the build
+is silent. Three call sites warn and nothing else:
+
+| Call | Line | Status |
+| ---- | ---- | ------ |
+| `DTLSv1_2_method()` | 1472 | deprecated since 1.1.0, still functional |
+| `ERR_load_BIO_strings()` | 1468 | deprecated since 3.0, no-op |
+| `ERR_load_SSL_strings()` | 1469 | deprecated since 3.0, no-op |
+
+`SSL_library_init`, `SSL_load_error_strings`, `ERR_load_crypto_strings` and
+`SSL_CTX_set_ecdh_auto` warn not at all — they are no-op macros in 3.x.
+
+**The pinned cipher and the test certs both clear modern policy.**
+`ECDHE-RSA-AES256-GCM-SHA384` (hardcoded at line 1494) is still enabled at the
+default security level on OpenSSL 3.6.4, and survives an explicit
+`@SECLEVEL=2`. The `Certificates.cpp` cert is RSA-4096 signed
+`sha384WithRSAEncryption`, valid 2016-05-12 to 2036-05-07 — nowhere near any
+security-level floor, and not expiring inside this project's life.
+
+**Verified on the target machine.** CONFIRMED on **clang 22 + OpenSSL 3.6.4**,
+`-std=c++14`: 0 errors, exactly the 3 warnings tabled above (test-log #4). Also
+CONFIRMED on OpenSSL 3.0.13 for the compile/link/handshake, so the result holds
+across six minor versions rather than resting on one. Re-run
+`t4_openssl_probe.cpp` after any OpenSSL major upgrade; that is what it is for.
+
+---
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -257,7 +302,7 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
-| *(none yet)* | |
+| "OpenSSL 3.x will break `SecureSocketDriver.cpp` at T4 step 5 — expect removed 1.0.2-era APIs (custom `BIO_METHOD`, `HMAC_CTX_init`, opaque-struct breaks)." Raised in session, never promoted past UNVERIFIED. | **WRONG.** The file is already 1.1.0-era API. Compiles with 0 errors / 3 deprecation warnings on OpenSSL 3.0.13; DTLS 1.2 handshake completes with the shipped certs. Cause of the error: predicted from Lumberyard's release date instead of reading the file. Two tells were visible in the source the whole time (`X509_get0_notBefore`, `BIO_s_mem`). Lesson is charter §4 verbatim — *prefer the source to the sample*. |
 
 ---
 
@@ -269,4 +314,7 @@ at project start.
 
 | #   | Test / capture | Prediction | Result |
 | --- | -------------- | ---------- | ------ |
-| *(none yet)* | | | |
+| 1 | Compile + link a probe TU reproducing every OpenSSL call site in `SecureSocketDriver.cpp` @ `413ecaf`, `-std=c++14`, against OpenSSL 3.0.13 headers/libs. | Hard errors from APIs removed after 1.0.2. | **Prediction falsified.** 0 errors, 3 deprecation warnings, links and runs clean. Artefact kept as `t4_openssl_probe.cpp`. |
+| 2 | Live DTLS 1.2 handshake (`openssl s_server`/`s_client`) using the `Certificates.cpp` cert+key and the hardcoded `ECDHE-RSA-AES256-GCM-SHA384`, OpenSSL 3.0.13. | Rejected on security level or cipher policy. | **Prediction falsified.** `Protocol: DTLSv1.2`, `Cipher: ECDHE-RSA-AES256-GCM-SHA384`, `Verify return code: 0 (ok)`. |
+| 3 | `openssl ciphers -s -v 'ECDHE-RSA-AES256-GCM-SHA384'` on the actual target machine (Garuda, OpenSSL 3.6.4). | Cipher still listed at default seclevel. | **Confirmed.** Listed, `TLSv1.2 Kx=ECDH Au=RSA Enc=AESGCM(256) Mac=AEAD`. |
+| 4 | Compile `t4_openssl_probe.cpp` on the target machine: **clang 22, OpenSSL 3.6.4**, `-std=c++14`. | 0 errors, the same 3 deprecation warnings. | **Confirmed exactly.** 0 errors; 3 warnings (`ERR_load_BIO_strings`, `ERR_load_SSL_strings`, `DTLSv1_2_method`). Crypto-library question for T4 step 5 is closed. Side result: clang 22 accepts `-std=c++14` on this TU without complaint — a first, narrow data point for step 1. |
