@@ -1,4 +1,2 @@
-build/obj/
-build/logs/
-build/*.a
-build/carrier_probe
+build/*
+!build/*.pcap
