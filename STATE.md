@@ -9,6 +9,15 @@ what comes next. Nothing described here as existing needs to be rebuilt.
 > reorder, or "clean up." A wrong belief moves to the Corrections table (§13); it
 > does not disappear.
 
+> **Repair note — 2026-08-29.** This file was rewritten once to fix accumulated
+> damage. **No finding, correction, or test-log row was deleted.** What changed:
+> broken markdown tables in §13 and §14 repaired; a duplicate `Capture output`
+> row in §5 merged; the misnumbered "§8+" stub renumbered to §12; the mangled
+> paste fragment in §2 removed; and the **status prose in §1, §2 and §3 replaced**,
+> because it described the pre-T4 position and contained no findings — only stale
+> planning. Superseded *findings* are marked inline and left in place. One new
+> correction was added to §13 (the `TypeInfo.h` patch) and one new row to §14.
+
 ---
 
 ## 1. What this project is
@@ -19,18 +28,20 @@ in this order:
 
 1. **Transport layer** — how the client secures and frames network messages
    (socket path, crypto boundary, packet headers, reliability, reassembly).
-   **Not started.**
+   **In progress.** T1, T2, T4 complete; T3 next, then T5.
 2. **Protocol layer** — what the messages mean (handshake, dispatch table,
-   replica model, wire encoding of the messages a session needs). **Not started.**
+   replica model, wire encoding of the messages a session needs). **Not started**
+   — blocked on H3, which is blocked on H1+H2.
 3. **Server layer** — a server that completes a handshake, stands a character in
-   the world, and serves enough state to render and move. **Not started.**
+   the world, and serves enough state to render and move. **Not started.** Its
+   content source is ready (D2, §11).
 
-**Prior belief going in (UNVERIFIED until T1):** the client is GridMate-based or a
-fork of it. New World's development began ~2016 on Amazon Lumberyard, which is the
-GridMate era; but Amazon had ~5 years and a dedicated engine team before the 2021
-launch, and O3DE deprecated GridMate for `AzNetworking` around 2021. So the client
-could be stock GridMate, an internal fork, or a full replacement. **T1 settles
-this and nothing should be built on the assumption before it does.**
+**Engine question: SETTLED (T1, §10).** The client is **GridMate**, not O3DE
+`AzNetworking` and not a rewrite. The decisive evidence is
+`TransportLayerGridMate` — New World's own wrapper class, so GridMate is the live
+network layer rather than a leftover string. The pre-T1 uncertainty (2016
+Lumberyard origin vs. a possible O3DE-era replacement) is resolved in favour of
+GridMate, and the reference-build strategy holds.
 
 ### The reference build is the primary instrument, not a side project
 
@@ -39,7 +50,7 @@ built from that fork — two processes, our control, full source, symbols, no
 runtime protections — is the independent source against which every claim about
 the retail client is checked (CHARTER §2, §4). When the reference build and the
 retail client conflict, the retail client is the truth; the reference is how we
-understand it.
+understand it. **This instrument now exists and works** (T4, §7–§9).
 
 ### Two hard boundaries (CHARTER §3)
 
@@ -56,54 +67,70 @@ understand it.
 
 ## 2. Where things stand
 
-> **As of 2026-08-29:** the text below this line is the pre-T4 position and is
-> superseded. T1, T2, T4 and D2 are complete — see §7–§11 and the test log §14.
-> The next chunk is T3.
+**As of 2026-08-29.**
 
-Nothing is built yet, but the reference fork has been **read from source** (see §7)
-and that answered several questions T4 would otherwise have hit blind: the crypto is
-confirmed OpenSSL DTLS, the dependency surface is AzCore-only, the C++ standard is
-C++14, the Linux platform-header include paths are known, and the test harness +
-certs are located. The `T4_PROMPT.md` file is written and ready to run.
+**Complete:**
 
-You've also now got the two things this session was for: T4's toolchain question is settled
- (-std=c++17, -include utility, the TypeInfo.h patch, system clang 22, no /opt/llvm14),
- (- and that needs to land in STATE along with the §13 correction that "C++14" was wrong.
+- **T4 — reference `Carrier` build.** Builds and runs on the target machine.
+  Recipe is `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w`
+  plus `-DDTLS1_RT_HEARTBEAT=24` for GridMate. 168/202 AzCore TUs, 41/41 GridMate
+  TUs. Plaintext **and** DTLS sessions both pass, both captured, both decoded.
+  Reproducible from a wiped `build/` (test #20). See §7, §8, §9.
+- **T1 — engine fingerprint (retail).** GridMate confirmed; O3DE absent. §10.
+- **T2 — crypto fingerprint (retail).** OpenSSL 1.1.1k, **statically linked**,
+  boundary at `SSL_read`/`SSL_write`. Static linkage means the H-track must use an
+  inline hook located by signature — no DLL proxying. §10.
+- **D2 — client game-data extraction.** 2250 datasheets → JSON with localization.
+  Track S has its content source. §11.
 
-The retail-client work (T1/T2 fingerprint) is still fully open and remains the thing
-that confirms whether the §7 reference facts survived into the shipped client.
+**Open, in dependency order:** T3 (retail transport recon) → T5 (the milestone
+diff) → H1, H2 → H3 → P-track → S-track. D1 can start any time.
 
-**Tooling on hand (per owner):** Ghidra, the retail New World client, the Lumberyard
-fork (cloned to `~/Documents/lumberyard`). **Still to set up:** the reference
-GridMate build from the fork (T4 — prompt ready), static-analysis extras
-(pev/radare2 for T1/T2), Wireshark (T3), Frida (H1).
+**Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
+with a 22-file sha256 baseline. See §5. This closes the only item in the project
+that had a clock on it.
+
+**One open discrepancy, carried from 2026-08-29:** the Lumberyard fork tree is
+**patched** (`RTTI/TypeInfo.h`, `false_v<T>` → `false_v<>`, committed), which
+contradicts §7's and test #6's claim of "no edits to Amazon's tree." The pin at
+`413ecaf` therefore does not describe the tree that built. See §13 and the
+UNVERIFIED note in §5.
 
 ---
 
 ## 3. What is next, in order
 
-Two things can proceed in parallel now, because §7 unblocked T4's inputs:
+**T3 — Transport recon (retail).** Prompt written: `T3_PROMPT.md`. Wireshark on a
+real login-to-in-world session, no hooks. This is the last input T5 needs, and it
+also settles §7's UNVERIFIED-for-retail question of which secure driver carries
+the world connection (`SecureSocketDriver` / UDP-DTLS vs.
+`StreamSecureSocketDriver` / TCP-TLS).
 
-**T4 — Reference `Carrier` build** (prompt ready in `T4_PROMPT.md`). Stand up the
-known-good instrument. Every input is resolved: carve-out scope, `-std=c++14`,
-clang-22-first, OpenSSL/DTLS, include paths, certs, harness pattern. Deliverable is
-two Carriers connecting locally, captured. This produces the reference handshake T5
-needs.
+Two procedural details decide whether it succeeds:
 
-**T1 — Engine fingerprint (retail).** Static Ghidra pass on the retail client.
-GridMate vs O3DE `AzNetworking` vs rewrite. Confirms whether §7's reference facts
-survived into the shipped client. Independent of T4 — can run alongside.
+- **Start the capture before the client connects.** Test #21 only caught the
+  cookie exchange because of this. A mid-session capture is all epoch ≥ 1
+  ciphertext and useless for T5.
+- **Disable voice chat in the client first.** `vivoxsdk.dll` (§10) opens its own
+  UDP flow that resembles a game stream and parses as neither DTLS nor Carrier.
 
-Then:
-- **T2 — Crypto-library fingerprint (retail).** Confirm the plaintext boundary is
-  OpenSSL `SSL_read`/`SSL_write` as §7 predicts, or find what replaced it.
-- **T3 — Transport recon.** Wireshark, no hooks. Transport, ports, size/timing,
-  entropy transition.
-- **T5 — Reference vs retail handshake diff.** The milestone: does the retail
-  ClientHello match the DTLS `RecordHeader`/`HandshakeHeader` shape from §7?
+The falsifiable prediction to record before capturing: **the retail ClientHello
+advertises exactly one cipher suite, `0xC030`** (`ECDHE-RSA-AES256-GCM-SHA384`),
+because GridMate hardcodes it at `SecureSocketDriver.cpp:1494`. A single-suite
+match is close to conclusive for a stock-ish GridMate transport. A normal
+multi-suite list means Amazon replaced the `SSL_CTX` setup, and T5's verdict needs
+qualifying even though T1 said GridMate.
 
-D2 (`.datasheet` extraction) runs in parallel from the start — low effort, and the
-server needs the data to serve anything.
+**Then T5 — reference vs retail handshake diff.** The chunk that answers the
+charter's core question. Both inputs will be in hand: the reference epoch-0
+handshake from T4 (§9) and the retail epoch-0 handshake from T3.
+
+**Then Track H opens.** H2 (locate the dispatch point in retail, static Ghidra)
+can in fact start now — it needs no login and no running client. It is the
+fallback if T3 stalls for lack of a usable account or live servers.
+
+**D1 (signature-scan harness)** has a free head start: the `Bin64.sha256` baseline
+in §5 already answers "which binaries did this patch touch."
 
 ---
 
@@ -133,50 +160,54 @@ server needs the data to serve anything.
 Working style: propose an approach, name the check that would prove it wrong, run
 it on the reference build, then work the retail client.
 
+**Session-loop discipline (added 2026-08-29).** The pattern that works is: predict
+→ run **one** command → read the exact error → fix → re-probe. That is what took
+T4 from "provision an isolated toolchain" to "two flags and a five-line patch" in
+about twenty minutes. The failure mode is reasoning from memory across several
+turns without asking for a command to be run. Keep the loop tight.
+
 ---
 
 ## 5. Environment and machine layout
 
-Owner's environment (from user setup): **Garuda Linux, fish shell**, IntelliJ /
-CLion available; the retail client is Windows, so Ghidra runs against the Windows
-binary and dynamic work (Frida, Wireshark) targets the client under Windows or
-Proton — record which once T3/H1 establish the working setup.
+Owner's environment: **Garuda Linux, fish shell**, IntelliJ / CLion available.
+The retail client is a Windows PE; Ghidra runs against the Windows binary, and
+dynamic work runs against the client **under Proton** (confirmed below).
 
 | What                        | Path / value                          |
 | --------------------------- | ------------------------------------- |
-| Client build under test     | **New World: Aeternum**, appid 1063730, **buildid 22469132**, installdir `New World`, ~71.2 GiB. Installer/depot **NOT yet pinned** — see §11. |
-| Retail client binary        | `~/.steam/steam/steamapps/common/New World/Bin64/NewWorld.exe` (171 MB, unpacked). Steam build, OpenSSL 1.1.1k statically linked. |
-| Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, stock fork of aws/lumberyard, `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
-| Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
-| NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M) |
-| Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
-| Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Probe result below. |
-| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 22 (T4 step 1). See §7 for why each flag is there. |
-| Ghidra project              | not yet created. RTTI survived (§10), so run the PE RTTI analyzer first — it recovers the ReplicaChunk class tree cheaply. |
-| Capture output              | `<path>`                              |
-| NWLY repo (local)           | `~/Documents/NWLY` |
-| Retail install path         | `/home/kaatlev/.local/share/Steam/steamapps/common/New World`. **`~/.steam/steam/...` is a symlink to this same directory** — the §5/§11 path difference was never a conflict. |
-| Pinned build                | buildid **22469132**, `LastUpdated` 1787844457 (2026-08-27). Depot 1063731 → manifest `5202358862838894766`; depot 1063732 → `5672526915328587099`; depot 1063730 → `4762214502346222814` (not in `InstalledDepots`, same update timestamp). appmanifest + 3 manifests + full `Bin64/` (272M, 22-file sha256 baseline) at `~/Documents/nwly-pin/22469132/`. Outside the repo, not committed (CHARTER §3). |
-| Pin caveat                  | Manifest ids are **documentation, not insurance** — `steam console` → `download_depot` only works while Valve's CDN retains those chunks, and old manifests are pruned. The `Bin64/` byte copy is the actual insurance; the 71G of paks are already reduced to `~/Documents/nwly-datasheets`. |
-| Patch-detection baseline    | `cd $NW; and sha256sum -c ~/Documents/nwly-pin/22469132/Bin64.sha256` lists exactly which binaries a patch touched. `Bin64/logs/` excluded (mutable, would false-positive on first launch). Seed for D1. |
-| Client runtime              | **Proton** — `steamapps/compatdata/1063730` exists. The retail client is a PE process under Wine on this host. Neutral for T3 (traffic exits `enp2s0` normally); a real complication for H1/H3, since Frida attaching inside Wine is a different problem from attaching natively. **Resolves the "Proton vs native still undecided" note below.** |
-| Capture interface           | **`enp2s0`**, host `192.168.1.33`, gateway `192.168.1.1`. Not `-i any` — avoids Linux-cooked (SLL) framing, so retail captures share `DLT_EN10MB` with the T4 loopback ones. |
-| Capture output              | `~/Documents/nwly-captures/` (gitignored). Reference captures remain in `build/*.pcap`. |
-| EasyAntiCheat location      | `New World/EasyAntiCheat/` (`EasyAntiCheat_EOS_Setup.exe`, `EOSSDK-Win32-Shipping.dll`, `EOSSDK-Win64-Shipping.dll`) — **a sibling of `Bin64/`, not inside it.** §10's mention could be read as implying `Bin64/`; a scan of `Bin64/` alone would wrongly conclude EAC is absent. Location only. CHARTER §3 — not touched. |
+| Client build under test     | **New World: Aeternum**, appid 1063730, **buildid 22469132**, installdir `New World`, SizeOnDisk 76,416,676,920 (~71.2 GiB). `LastUpdated` 1787844457 (2026-08-27). |
+| Retail install path         | `/home/kaatlev/.local/share/Steam/steamapps/common/New World`. **`~/.steam/steam/steamapps/...` is a symlink to this same directory** — the two paths seen in earlier sections are the same place, never a conflict. |
+| Retail client binary        | `<install>/Bin64/NewWorld.exe` (171 MB, unpacked). Steam build, OpenSSL 1.1.1k statically linked. |
+| **Build pinned**            | Depot 1063731 → manifest `5202358862838894766`; depot 1063732 → `5672526915328587099`; depot 1063730 → `4762214502346222814` (not in `InstalledDepots`, same 27 Aug 10:44 timestamp, kept anyway). appmanifest + 3 manifests + full `Bin64/` at `~/Documents/nwly-pin/22469132/` (272M). Outside the repo, not committed (CHARTER §3). |
+| Pin caveat                  | Manifest ids are **documentation, not insurance** — `steam console` → `download_depot` only works while Valve's CDN retains those chunks, and old manifests get pruned. The `Bin64/` byte copy is the actual insurance. The 71G of paks are already reduced to `~/Documents/nwly-datasheets`. |
+| Patch-detection baseline    | `cd <install>; and sha256sum -c ~/Documents/nwly-pin/22469132/Bin64.sha256` lists exactly which binaries a patch touched. 22 entries; `Bin64/logs/` excluded (mutable, would false-positive on first launch). Seed for D1. Committed to the repo at `pins/22469132/Bin64.sha256` — hashes only, no Amazon content. |
+| Client runtime              | **Proton.** `steamapps/compatdata/1063730` exists, so the retail client is a PE process under Wine on this host. Neutral for T3 (traffic exits `enp2s0` normally); a real complication for H1/H3, since Frida attaching inside Wine is a different problem from attaching natively. |
+| Capture interface           | **`enp2s0`**, host `192.168.1.33`, gateway `192.168.1.1`. Not `-i any` — that yields Linux-cooked (SLL) framing; `enp2s0` keeps retail captures on `DLT_EN10MB`, matching the T4 loopback captures so `decode_carrier.py` sees the same link layer. |
+| Capture output              | Retail: `~/Documents/nwly-captures/` (outside the repo). Reference: `build/*.pcap` (gitignored except `!build/*.pcap`). |
+| EasyAntiCheat location      | `<install>/EasyAntiCheat/` — `EasyAntiCheat_EOS_Setup.exe`, `EOSSDK-Win32-Shipping.dll`, `EOSSDK-Win64-Shipping.dll`. **A sibling of `Bin64/`, not inside it.** §10's mention could be read as implying `Bin64/`; a scan of `Bin64/` alone would wrongly conclude EAC is absent. Location recorded only. CHARTER §3 — not touched, not analysed. |
+| Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, fork of aws/lumberyard, branch `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
+| Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` — the tree all §7 facts were **read** from. **NOT the tree that built.** See the next row and §13. |
+| **Fork patch (UNVERIFIED hash)** | `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` is clean, so the patch is **committed**. The build recipe is `413ecaf` **plus this patch**. **Open action:** run `git log --oneline 413ecaf24d7a534801cac64f50272fe3191d278f..HEAD` and record the real commit hash here. |
+| NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M). Local: `~/Documents/NWLY`. |
+| Toolchains                  | System **clang 22** (also used by PZMapMaker — do not disturb). `/opt/llvm14` was considered and **rejected** — see §7. |
+| Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Reference build only; retail ships its own static 1.1.1k. |
+| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. |
+| GridMate build recipe       | The AzCore recipe plus `-I GridMate -I GridMate/Platform/Linux` and **`-DDTLS1_RT_HEARTBEAT=24`**. See §7. |
+| Ghidra project              | Not yet created. RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
 
+**Gotchas found so far:**
 
-Gotchas found so far:
 - **`fd` is not installed** on this machine; use `find`. `rg` (ripgrep) IS present.
-  Watch stray `-h` in a piped command — it can be parsed as ripgrep's `--help` and
-  dump the man page instead of matching.
-- **Disk:** single 1.9T nvme root (`/dev/nvme0n1p2`), ~591G free as of setup. Room
-  for `/opt/llvm14` (~1.5G) and captures.
-- **Installed static-analysis tools:** Ghidra (owner-installed). Still to add per
-  chunk: pev/radare2 (T1/T2), Wireshark (T3), Frida (H1), zstandard (D2).
-- **Proton vs native for dynamic tools is still undecided** — the retail client is
-  Windows; where it runs decides the Frida/Wireshark setup. Record once T3/H1 land.
-
-<!-- Keep filling as things cost time: fish quoting, alias surprises, RTTI survival in the client build. -->
+  Watch a stray `-h` in a piped command — ripgrep parses it as `--help` and dumps
+  the man page instead of matching.
+- **`grep -c` exits 1 on a zero count**, so a shell reports an error on a
+  successful "absent" check. The count is the result, not the exit code (test #22).
+- **fish aborts a failed glob before evaluating the `or`.** Use `find` for
+  existence checks, not a shell glob (§10).
+- **Disk:** single 1.9T nvme root (`/dev/nvme0n1p2`), ~591G free as of setup.
+- **Installed tooling:** Ghidra, `tcpdump`, Go, clang 22. **Still to add per
+  chunk:** `wireshark-cli` (T3), Frida (H1), pev/radare2 (optional for H2).
 
 ---
 
@@ -195,9 +226,25 @@ itself was compiled (§7, §13). A clean probe run means "the API era matches",
 not "OpenSSL is fine". The real test is compiling `SecureSocketDriver.cpp`.
 
 **`build_gridmate.sh`** — builds `libazcore.a` and `libgridmate.a` from the fork
-using the step-1 recipe. Writes nothing inside the Lumberyard tree; all output
-goes to `./build`. Incremental, parallel, and tolerant of the expected 3rdParty
-failures. `--ly` points at the fork, `--show-failures` lists what broke.
+using the §5 recipe. Writes nothing inside the Lumberyard tree; all output goes to
+`./build`. Incremental, parallel, and tolerant of the expected 3rdParty failures.
+`--ly` points at the fork, `--show-failures` lists what broke.
+
+**`triage.sh`** — bulk compile triage. Compiles every AzCore (or GridMate) TU
+independently with the proven recipe and reports which fail and why, grouped by
+error kind. `bash triage.sh [azcore|gridmate]`. The `sed` normalisation that
+collapses quoted identifiers to `X` before `sort | uniq -c` is what turned test
+#10's 34 failures into "27 rapidjson, 6 Lua, 1 rapidxml" instead of 34 separate
+investigations. Wanted again the first time the fork or the toolchain moves.
+
+**`CMakeLists.txt`** — a CMake path to the same reference build (`azcore`,
+`gridmate`, `carrier_probe` targets). Redundant with `build_gridmate.sh` for
+building, but it sets `CMAKE_EXPORT_COMPILE_COMMANDS ON` and gives CLion a
+loadable project — much better than a shell script when stepping through the
+reference Carrier with a debugger during H1. Note its header comment is what
+caught the `TypeInfo.h` patch discrepancy (§13). Two stale comments inside it:
+it does not carry `-fdelayed-template-parsing`, and its "expect Linux-specific
+DTLS bugs" note was falsified by test #17.
 
 **`nwly_carrier_probe.cpp`** — the T4 step-4 harness. Two Carriers on loopback,
 handshake, payload both ways, exit 0 on success. Path B: no gtest, no AzTest.
@@ -208,22 +255,26 @@ Build line is in its header comment.
 One command; handles the sudo and the start/stop sequencing.
 
 **`decode_carrier.py`** — decodes a capture against the Carrier layout read from
-`Carrier.cpp`. This is the step-4 completion check: it is the artefact that
-proves source and wire agree, and it is the starting point for diffing our
-traffic against retail.
+`Carrier.cpp`, and recognises DTLS records as well. This is the step-4 completion
+check: the artefact that proves source and wire agree, and the starting point for
+diffing our traffic against retail. **T3 points this at retail for the first
+time.**
 
-Otherwise nothing yet. This section fills as chunks complete. Each completed chunk's
-FINDINGS block folds into the relevant section here.
+**`t1_fingerprint.sh`** / **`t1_evidence.sh`** — the T1 scanners. First gives
+family counts and the verdict; second dumps the verbatim matched strings.
+
+**`T3_PROMPT.md`** — the ready-to-run chunk prompt for T3.
+
+Each completed chunk's FINDINGS block folds into the relevant section here.
 
 ---
 
-## 7. Transport facts — CONFIRMED from the reference fork source (pre-T4)
+## 7. Transport facts — CONFIRMED from the reference fork source
 
-Established by reading `~/Documents/lumberyard` directly, before any build. These
-describe **GridMate as it ships in the fork**. They are the reference layout; the
-*retail* client (built years later) must still be fingerprinted (T1/T2) to confirm
-each survived — Amazon may have swapped OpenSSL for BoringSSL, moved DTLS versions,
-or switched to the stream driver. UNVERIFIED-for-retail is noted where it matters.
+Established by reading `~/Documents/lumberyard` directly, then confirmed by
+building and running it (T4). These describe **GridMate as it ships in the fork**.
+They are the reference layout; where a fact still needs confirming against the
+*retail* client, it is marked UNVERIFIED-for-retail.
 
 ### The secure transport is OpenSSL DTLS
 
@@ -235,15 +286,20 @@ record header), `DTLS1_HM_HEADER_LENGTH` (12-byte handshake header),
 `SSL3_MT_CLIENT_HELLO`, and a hello-verify-request cookie exchange.
 
 **Consequences:**
+
 - The plaintext hook boundary (H-track) is OpenSSL `SSL_read` / `SSL_write` — the
-  charter §4 "hook above the crypto" target, now confirmed from the reference side.
+  charter §4 "hook above the crypto" target. **Confirmed on both sides now:** from
+  the reference source here, and from the retail binary in §10.
 - The `RecordHeader` (13 bytes) and `HandshakeHeader` (12 bytes) structs in that
   file **are the DTLS wire framing**. They are T5's reference layout — read them,
-  don't reverse them.
+  don't reverse them. Confirmed on the wire in §9.
+- **A single cipher suite is hardcoded** at `SecureSocketDriver.cpp:1494`:
+  `ECDHE-RSA-AES256-GCM-SHA384` (`0xC030`). This is T3/T5's sharpest falsifiable
+  prediction — see §3.
 - There are **two** secure drivers: `SecureSocketDriver` (datagram/DTLS) and
   `StreamSecureSocketDriver` (stream/TLS). Which one the retail MMO uses for its
-  main connection is a specific T5 question — persistent-world traffic could lean
-  either way. **UNVERIFIED for retail.**
+  main connection is a specific T3/T5 question — persistent-world traffic could
+  lean either way. **UNVERIFIED for retail.**
 
 ### GridMate's dependency surface is clean
 
@@ -252,17 +308,21 @@ other frameworks (no AzFramework, no gems). The T4 carve-out is therefore
 **AzCore + GridMate only**. The AzCore surface used is foundational and broad but
 shallow: `Memory` (allocators), `std/` (their STL reimpl — containers, smart
 pointers, `parallel/*` threading), `Math`, `EBus`, `RTTI/TypeInfo`,
-`Socket/AzSocket` (UDP), `State/HSM`. Links pthreads.
+`Socket/AzSocket` (UDP), `State/HSM`. Links pthreads. **Confirmed by build:**
+test #10 found every AzCore failure was a missing 3rdParty header, none on
+GridMate's dependency surface.
 
-### Build facts
+### Build facts — pre-T4 reading, two entries SUPERSEDED
 
-- **C++ standard: C++14.** `dev/Tools/build/waf-1.7.13/platforms/compile_settings_clang.py`
-  sets `-std=c++1y`. Pass `-std=c++14` to a standalone build.
+- **~~C++ standard: C++14.~~** `dev/Tools/build/waf-1.7.13/platforms/compile_settings_clang.py`
+  sets `-std=c++1y`. **SUPERSEDED — see §13.** The source requires **C++17**;
+  `Math/Crc.inl:114` uses an `auto` template parameter and `-std=c++14` is a hard
+  error with no flag that rescues it. The Waf setting is what the 2019 clang was
+  told, not what the code needs.
 - **No hard clang version gate.** `AZ_COMPILER_CLANG` is defined as `__clang_major__`
-  in `PlatformDef.h` — it accepts whatever clang major is present. So try system
-  clang 22 with `-std=c++14 -Wno-error` first; provision `/opt/llvm14` only on real
-  compile errors from removed C++14-era features. UNVERIFIED whether clang 22
-  actually compiles it clean — that is T4 step 1.
+  in `PlatformDef.h` — it accepts whatever clang major is present. **Now CONFIRMED:**
+  clang 22 compiles the tree clean under the §5 recipe, and the recipe also holds on
+  clang 18, so it is not an artifact of one compiler build.
 - **Platform-header include paths** (what Waf resolves and a standalone build must
   supply): Waf prepends the `Platform/<OS>/` dir to the include search path. For
   Linux:
@@ -272,20 +332,22 @@ pointers, `parallel/*` threading), `Math`, `EBus`, `RTTI/TypeInfo`,
   `g_untrustedCertPEM` / `g_untrustedPrivateKeyPEM` (declared `extern` in the tests).
   Compile that file to satisfy the DTLS handshake's cert/key need.
 
-### The test harness — a gift, with a caveat
+### The test harness — a gift, with a caveat that did not materialise
 
 `dev/Code/Framework/GridMate/Tests/Carrier.cpp` is Amazon's own two-process Carrier
 test, with `SocketDriverProvider` (plaintext) and `SecureDriverProvider`
 (DTLS) already abstracted — i.e. the charter §2 plaintext-then-secure toggle is
 built in. But `Tests.h` drags in AzCore UnitTest, Driller, Streamer, and the
-Session layer, more than §2 needs. T4 plan: write a minimal `main()` (Path B),
-using `Carrier.cpp` as the construction pattern, not the full harness (Path A).
+Session layer, more than §2 needs. T4 used a minimal `main()` (Path B), taking
+`Carrier.cpp` as the construction pattern rather than the full harness (Path A).
 
-**Caveat — DTLS-on-Linux is likely untested by Amazon.** No
+**~~Caveat — DTLS-on-Linux is likely untested by Amazon.~~** No
 `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` definition exists under the Linux
-platform dir, so it defaults off. T4 must define it explicitly and should expect to
-shake out Linux-specific DTLS-path bugs. The **plaintext** Carrier path is the safe
-first milestone.
+platform dir, so it defaults off, and T4 was told to expect Linux-specific DTLS
+bugs. **SUPERSEDED — see §13 and test #17.** DTLS passed on the first run, on both
+clang majors. The trait gates the *test harness*, not the driver, and the driver
+sits on `SocketDriverCommon`, which the plaintext path exercises constantly.
+*Untested* is not *broken*.
 
 ---
 
@@ -319,11 +381,11 @@ default security level on OpenSSL 3.6.4, and survives an explicit
 `sha384WithRSAEncryption`, valid 2016-05-12 to 2036-05-07 — nowhere near any
 security-level floor, and not expiring inside this project's life.
 
-**Verified on the target machine.** CONFIRMED on **clang 22 + OpenSSL 3.6.4**,
-`-std=c++14`: 0 errors, exactly the 3 warnings tabled above (test-log #4). Also
-CONFIRMED on OpenSSL 3.0.13 for the compile/link/handshake, so the result holds
-across six minor versions rather than resting on one. Re-run
-`t4_openssl_probe.cpp` after any OpenSSL major upgrade; that is what it is for.
+**Verified on the target machine.** CONFIRMED on **clang 22 + OpenSSL 3.6.4**:
+0 errors, exactly the 3 warnings tabled above (test-log #4). Also CONFIRMED on
+OpenSSL 3.0.13 for the compile/link/handshake, so the result holds across six
+minor versions rather than resting on one. Re-run `t4_openssl_probe.cpp` after any
+OpenSSL major upgrade; that is what it is for.
 
 ---
 
@@ -349,16 +411,18 @@ both covered). Test-log #5–#9.
 | ---- | ---------- | ----- |
 | `-std=c++17` | `Math/Crc.inl:114: 'auto' not allowed in template parameter until C++17` | The source is *not* C++14. See correction §13. |
 | `-include utility` | `std/utils.h:45: no member named 'exchange' in namespace 'std'` | `using std::exchange;` relied on a transitive `<utility>` that modern libstdc++ no longer pulls in. |
-| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. |
+| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. **NOTE: the fork has since been patched to `false_v<>`, which fixes the same error at source. Whether this flag is still required is UNVERIFIED — see §13.** |
 | `-w` | ~31 warnings under C++14 | Cosmetic only, and 0 under C++17 anyway. Drop it if you want to read them. |
 
-**Decision: do NOT provision `/opt/llvm14`.** §7's earlier plan was to fall back
-to LLVM 14 on real compile errors. Real errors did occur — but none were removed
-language features. Both are toolchain drift with a flag-level fix and **no edits
-to Amazon's tree**, which keeps the charter's version-locking rule satisfied.
-Three flags beat carrying a second 2022 toolchain for the life of the project.
+**Decision: do NOT provision `/opt/llvm14`.** An earlier plan was to fall back to
+LLVM 14 on real compile errors. Real errors did occur — but none were removed
+language features. Three flags beat carrying a second 2022 toolchain for the life
+of the project. ~~Both are toolchain drift with a flag-level fix and **no edits to
+Amazon's tree**, which keeps the charter's version-locking rule satisfied.~~
+**That last clause is SUPERSEDED — the tree IS patched. See §13.** The
+`/opt/llvm14` decision itself stands.
 
-**Third include path, undocumented in the §7 list.**
+**Third include path, undocumented in the original list.**
 `Platform/Linux/AzCore/Math/Internal/MathTypes_Linux.h` includes
 `Platform/Common/SIMD/AzCore/Math/Internal/MathTypes_SIMD.h` by a path relative
 to `dev/Code/Framework/AzCore`. It is satisfied by `-I AzCore` alone, so no
@@ -424,9 +488,9 @@ Archive order matters. No undefined symbols — the gmock/zstd objects in
 
 ## 8. Wire format — CONFIRMED, GridMate Carrier (plaintext)
 
-Read from `GridMate/Carrier/Carrier.cpp` @ `413ecaf` and confirmed against a
-live loopback capture (test-log #15/#16). Layout came from the source first;
-the capture only confirmed it.
+Read from `GridMate/Carrier/Carrier.cpp` and confirmed against a live loopback
+capture (test-log #15/#16). Layout came from the source first; the capture only
+confirmed it.
 
 **Byte order: big-endian throughout.** `kCarrierEndian = EndianType::BigEndian`,
 `Carrier.cpp:58`.
@@ -555,29 +619,33 @@ The handshake above is the only part of a secure session that is readable
 without session keys, which makes it the only part usable for diffing against
 retail.
 
+**This capture is T5's reference input.** The retail counterpart comes from T3.
+
 ---
 
 ## 10. FINDINGS — T1 (engine fingerprint) + T2 (crypto), static
 
-**Client build under test:** `NewWorld.exe`, 171 MB, Steam install, unpacked.
-OpenSSL version string `OpenSSL 1.1.1k  25 Mar 2021`. (Exact game build number
-not yet recorded — worth pulling from the launcher before T5.)
+**Client build under test:** `NewWorld.exe`, 171 MB, Steam install, unpacked,
+buildid 22469132. OpenSSL version string `OpenSSL 1.1.1k  25 Mar 2021`. (Exact
+game version string from the launcher still not recorded — worth pulling before
+T5.)
 
-**Status:** T1 complete. T2 all but the anti-cheat non-goal — crypto library,
-boundary function and linkage are all answered below.
+**Status:** T1 complete. T2 complete except its anti-cheat non-goal — crypto
+library, boundary function and linkage are all answered below.
 
 **Method:** `strings -a -n 6` over every binary >1 MB, families counted then
 dumped verbatim (`t1_fingerprint.sh`, `t1_evidence.sh`). No Ghidra needed to
 reach the verdict; no dynamic analysis; the game was never launched.
 
 **Confirmed — engine is GridMate, not O3DE:**
+
 - Decisive: `TransportLayerGridMate` and `TransportLayerGridMateTickThread` —
   New World's own class wrapping GridMate transport, so GridMate is the live
   network layer, not a leftover string.
 - Replica stack present: `GridMateLANSessionReplica`, `GridMatePeerReplica`,
-  `GridMateReplicaStatus`, `GridMateReplicaSessionInfo`, `GridMatePeerReplica`,
-  plus `GridMateAllocatorMP` / `GridMateAllocator` (the same allocators the T4
-  probe had to bootstrap by hand).
+  `GridMateReplicaStatus`, `GridMateReplicaSessionInfo`, plus
+  `GridMateAllocatorMP` / `GridMateAllocator` (the same allocators the T4 probe
+  had to bootstrap by hand).
 - Gameplay replica chunks ride it: `VTransformReplicaChunk`,
   `VTriggerAreaReplicaChunk`, `ScriptComponentReplicaChunk`, and ~94
   `InitializeReplicatedFields` references — the `ReplicaManager` shape the T4
@@ -596,25 +664,50 @@ consistent with `SocketDriver`. (String-level evidence; Ghidra should confirm
 these are real imports, not incidental ASCII.)
 
 **Confirmed — crypto (this is most of T2):**
+
 - Library: **OpenSSL 1.1.1k (25 Mar 2021)**. Same DTLS-over-OpenSSL design as
   the T4 reference build.
 - Plaintext boundary: **`SSL_read` / `SSL_write`** (`dtls1_`, `DTLSv1` also
   present — DTLS confirmed).
-- Linkage: **static.** No `*ssl*` / `*crypto*` / `*eay*` DLL anywhere in
-  `Bin64/` (checked with `find`). Consequence for the H-track: **no DLL
-  proxying is possible** — a hook above the plaintext boundary must be an inline
-  hook located by signature, patched in memory. This is the harder of T2's two
-  outcomes and it sets H1's method.
+- Linkage: **static.** Consequence for the H-track: **no DLL proxying is
+  possible** — a hook above the plaintext boundary must be an inline hook located
+  by signature, patched in memory. This is the harder of T2's two outcomes and it
+  sets H1's method.
 
 **Confirmed — RTTI survived (corrects an in-session claim):** MSVC mangled-name
 fragments are present, e.g. `UEAAXPEAVReplicaChunkBase` (`PEAV` = pointer-to-
 class) and `AEAAXAEBVGuildsComponentReplicatedState` (`AEBV` = const-ref-to-
 class). The binary is not stripped. Ghidra's PE RTTI analyzer will recover the
-class hierarchy — cheaper D2.
+class hierarchy — this is H2's cheapest starting point.
+
+### `Bin64/` module inventory — 22 files, build 22469132
+
+Positive inventory, replacing the earlier absence-based linkage argument:
+
+`NewWorld.exe` · `NewWorld.exe.eac` · `GameCrashUploader.exe` · `steam_api64.dll` ·
+`vivoxsdk.dll` · `bink2w64.dll` · `dbghelp.dll` · `libcds-amd64-vcv141.dll` ·
+`dstorage.dll` · `dstoragecore.dll` · `dxcompiler.dll` · `dxil.dll` ·
+`WinPixEventRuntime.dll` · `nvngx_dlss.dll` · `nvngx_dlssg.dll` ·
+`sl.dlss.dll` · `sl.dlss_g.dll` · `sl.common.dll` · `sl.interposer.dll` ·
+`sl.nis.dll` · `sl.pcl.dll` · `sl.reflex.dll`
+
+- **T2's static-linkage claim now rests on a list, not an empty `find`.** No
+  `*ssl*`, `*crypto*`, or `*eay*` module exists. Inline hook by signature
+  confirmed as the only H-track option.
+- **No `steamnetworkingsockets` / GameNetworkingSockets** — only `steam_api64.dll`,
+  the interface layer. Weak evidence against Steam Datagram Relay tunnelling the
+  game stream. **Absence argument only** — T3 settles it.
+- **`vivoxsdk.dll` is a second network stack in the same process.** Vivox opens
+  its own UDP media flow plus TCP signalling. It will appear in a T3 capture as a
+  sustained bidirectional UDP conversation that resembles a game stream and parses
+  as neither DTLS nor Carrier. **Disable voice chat before capturing.**
+- **`libcds-amd64-vcv141.dll` unidentified** (MSVC 2017 toolset, name suggests
+  Amazon-internal). Noted so H2 knows it exists before following xrefs.
 
 **Unverified (believed, not yet tested):**
+
 - That the `WSA*` strings are real imports rather than incidental ASCII. Test:
-  Ghidra import table, or `dumpbin`/`objdump -p`-equivalent on the PE.
+  Ghidra import table, or `objdump -p`-equivalent on the PE.
 - That retail's DTLS handshake matches the reference cookie exchange (§9). Test:
   T3/T5 — capture a retail session and diff the epoch-0 handshake.
 
@@ -625,40 +718,18 @@ DLLs (both scanned, both 0). Game code uses protobuf. Embedded
 cheaper** — potentially schema handed over rather than reverse-engineered. NOT
 extracted here per T1 non-goals; recorded as a flag only.
 
-**Noticed, out of scope:** EAC present (`EOSSDK-Win64/Win32-Shipping.dll`).
-Charter §3 — not touched, not analysed.
+**Noticed, out of scope:** EAC present. Its files live in `<install>/EasyAntiCheat/`,
+**not** in `Bin64/` — see §5 for the exact paths. Charter §3: location recorded,
+not touched, not analysed.
 
 **Commands worth keeping:**
+
 - `./t1_fingerprint.sh --out t1_scan.txt` — family counts + verdict.
 - `./t1_evidence.sh --out t1_evidence.txt` — the verbatim matched strings.
 - `find <Bin64> -iname '*ssl*' -o -iname '*crypto*' -o -iname '*eay*'` — the
   static-vs-dynamic linkage check (empty = static). Use `find`, not a shell
-  glob; fish aborts a failed glob before the `or`.
-  
-  
-  ### `Bin64/` module inventory — 22 files, build 22469132
-
-Positive inventory, replacing §10's absence-based linkage argument:
-
-`NewWorld.exe` · `NewWorld.exe.eac` · `GameCrashUploader.exe` · `steam_api64.dll` ·
-`vivoxsdk.dll` · `bink2w64.dll` · `dbghelp.dll` · `libcds-amd64-vcv141.dll` ·
-`dstorage.dll` · `dstoragecore.dll` · `dxcompiler.dll` · `dxil.dll` ·
-`WinPixEventRuntime.dll` · `nvngx_dlss.dll` · `nvngx_dlssg.dll` ·
-`sl.dlss.dll` · `sl.dlss_g.dll` · `sl.common.dll` · `sl.interposer.dll` ·
-`sl.nis.dll` · `sl.pcl.dll` · `sl.reflex.dll`
-
-- **T2's static-linkage claim now rests on a list, not an empty `find`.** No `*ssl*`,
-  `*crypto*`, or `*eay*` module exists. Inline hook by signature confirmed as the
-  only H-track option.
-- **No `steamnetworkingsockets` / GameNetworkingSockets** — only `steam_api64.dll`,
-  the interface layer. Weak evidence against Steam Datagram Relay tunnelling the
-  game stream. **Absence argument only** — T3 settles it.
-- **`vivoxsdk.dll` is a second network stack in the same process.** Vivox opens its
-  own UDP media flow plus TCP signalling. It will appear in a T3 capture as a
-  sustained bidirectional UDP conversation that resembles a game stream and parses
-  as neither DTLS nor Carrier. Disable voice chat before capturing.
-- **`libcds-amd64-vcv141.dll` unidentified** (MSVC 2017 toolset, name suggests
-  Amazon-internal). Noted so H2 knows it exists before following xrefs.
+  glob; fish aborts a failed glob before the `or`. **Prefer the full inventory
+  above** — an empty `find` is a weaker argument than a complete list.
 
 ---
 
@@ -668,8 +739,7 @@ Folded from FINDINGS — D2 — 2026-08-29. Pure offline file work: no client
 launch, no injection, read-only against the install (CHARTER §3 satisfied).
 
 **Build under test:** New World: Aeternum, Steam appid 1063730, **buildid
-22469132**, installdir `New World`, SizeOnDisk 76,416,676,920 (~71.2 GiB), at
-`/home/kaatlev/.local/share/Steam/steamapps/common/New World`.
+22469132**, at `/home/kaatlev/.local/share/Steam/steamapps/common/New World`.
 
 ### The pak container is standard ZIP
 
@@ -765,11 +835,8 @@ Outputs, gitignored and outside the repo (CHARTER §3 — not redistributed):
 
 ### UNVERIFIED — the loose ends
 
-- **No installer/depot pinned.** buildid 22469132 *identifies* this build but
-  will not re-download it. Manifest ids are in
-  `~/.local/share/Steam/depotcache/` or the appmanifest's `InstalledDepots`
-  block. **Pin them before the next game patch** (CHARTER §4 version-lock).
-  This is the only item here with a clock on it.
+- ~~**No installer/depot pinned.**~~ **RESOLVED 2026-08-29** — depot manifests
+  and a `Bin64/` byte copy are pinned. See §5.
 - That the `-partN` split is *driven by* the 65535 ceiling. Consistent with
   every count observed, but correlation. Tested by whether a future build
   exceeds it.
@@ -793,45 +860,46 @@ unaffected.
 
 ---
 
+## 12. Reserved for later confirmed findings
 
-## 8+. Reserved for later confirmed findings
-
-Sections from 8 onward are added as work produces confirmed results — retail
-fingerprint (T1/T2), header layouts confirmed against the reference build (T4/T5),
-message formats decoded from captures (P-track). Append-only: a new finding gets a
-new section; a finding that overturns an old one adds a Corrections row (§13) and
+New sections are added here as work produces confirmed results — retail transport
+recon (T3), the handshake diff verdict (T5), dispatch table (H2), message formats
+decoded from captures (P-track). Append-only: a new finding gets a new section; a
+finding that overturns an old one adds a Corrections row (§13) and
 promotes/demotes the claim rather than editing history away.
+
+*(This section was numbered "8+" and misplaced after §11 until the 2026-08-29
+repair. Renumbered, not rewritten.)*
 
 ---
 
 ## 13. Corrections — beliefs that turned out wrong
 
-Acting on any of these wastes real time. Empty at project start; every session
-that overturns a prior claim adds a row here rather than deleting the claim.
+Acting on any of these wastes real time. Every session that overturns a prior
+claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
-| --------- | ------ |
-| §13 correction that "C++14" was wrong.
+| "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. The reproducible recipe is that commit **plus** this patch, and test #20's reproducibility result holds for the *patched* tree only. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Two open actions:** (1) record the patch commit hash via `git log --oneline 413ecaf..HEAD`; (2) determine whether `-fdelayed-template-parsing` is still required now that the source is patched — the flag and the patch fix the same five diagnostics. |
+| "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. |
 | "RTTI is stripped from `NewWorld.exe` — no mangled names found." Said in session after the first scan's RTTI regex returned nothing. | **WRONG.** The regex only matched fully-formed `.?AV...@ns@@` symbols; the binary carries mangled-name *fragments* (`UEAAXPEAVReplicaChunkBase`, `AEBV...ReplicatedState`) that a stricter pattern missed. RTTI survived. Cause: judged absence from one narrow regex rather than a broad mangled-fragment search. Ghidra's RTTI analyzer will confirm and recover the class tree. |
 | "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
 | "OpenSSL 3.x is a non-issue for `SecureSocketDriver.cpp`; modern OpenSSL needs no shim." — stated after the probe compiled clean, and written into §7. | **TOO STRONG.** `SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, removed from OpenSSL after Heartbleed. It compiles only with `-DDTLS1_RT_HEARTBEAT=24`. Cause of the error: `t4_openssl_probe.cpp` enumerates *function calls*, so a removed *macro constant* was invisible to it. The probe's conclusion was right about the API era and wrong about completeness. Lesson: a probe proves what it tests, not what it was designed to reassure about. |
 | "Step 2 is understated — expect an explicit `AllocatorInstance` bootstrap in `main()` just to get AzCore compiling." Raised in session. | **WRONG about the phase, right about the trap.** Compiling AzCore needs no bootstrap at all: 168/202 TUs build with the plain step-1 recipe and every failure is a missing 3rdParty header. The bootstrap is a *runtime* requirement and it surfaced exactly at step 4, as a segfault in a binary that linked cleanly. See §7. |
-| "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — STATE §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. The original bullet is left in place per append-only — read it together with this row and §7's recipe subsection. |
 | "OpenSSL 3.x will break `SecureSocketDriver.cpp` at T4 step 5 — expect removed 1.0.2-era APIs (custom `BIO_METHOD`, `HMAC_CTX_init`, opaque-struct breaks)." Raised in session, never promoted past UNVERIFIED. | **WRONG.** The file is already 1.1.0-era API. Compiles with 0 errors / 3 deprecation warnings on OpenSSL 3.0.13; DTLS 1.2 handshake completes with the shipped certs. Cause of the error: predicted from Lumberyard's release date instead of reading the file. Two tells were visible in the source the whole time (`X509_get0_notBefore`, `BIO_s_mem`). Lesson is charter §4 verbatim — *prefer the source to the sample*. |
 | "D2 datasheets will be in `assets/GameData.pak`" — inferred from the name before looking. | **WRONG.** `GameData.pak` holds zero. All 2250 are in `SharedDataStrm-part{1..11}.pak` + base. Cause of the error: inferred location from a filename instead of reading the central directory. A census across all 130 paks settles it in one pass and should have been step one. |
 | "new-world-tools' documented path `assets/server/server.pak` is the datasheet source." — taken from the tool README. | **STALE for build 22469132.** No `assets/server/` directory exists in this install. The README predates the Aeternum relaunch. A session following it verbatim stalls here; go by the census, not the README. |
 | "EOCD entry counts of exactly 65535 are 16-bit saturation, so the 2250 datasheet count is a floor." — raised in session on seeing four paks report 65535. | **WRONG.** A direct `PK\x01\x02` central-directory walk gave `walked == eocd` on every pak including all four. No Zip64 anywhere. 2250 is exact. The `-partN` split exists precisely to stay under the 65535 ceiling. Reasonable suspicion, wrong conclusion — and the check was cheap. |
 | "Oodle (ZIP method 15) needs the MSVC redistributable, so Linux extraction is Proton-or-nothing." — inferred from the tool README listing MSVC as a dependency. | **WRONG.** `go-oodle-lz` + `ebitengine/purego` `dlopen` a **native** Oodle v2.9.13 fetched at first run. No wine, no PE DLL, no cgo. Built and extracted clean on Garuda. Cause of the error: read a dependency note written for the Windows release binaries and assumed it described the source. |
 | "645 datasheets extracted in 173ms is suspiciously fast — likely a silent failure." — raised in session. | **WRONG.** Output verified column-by-column: `MasterItemDefinitions_Faction`, 127 columns × 4121 rows, legible headers. Oodle is simply that fast. Worth the check regardless — it is the D2 prompt's named failure mode — but speed alone was not evidence of anything. |
+| "EAC ships as `EOSSDK-Win64/Win32-Shipping.dll`" — §10, written in a way that reads as implying `Bin64/`. | **IMPRECISE, and misleading in one specific way.** The EAC files live in `<install>/EasyAntiCheat/`, a **sibling** of `Bin64/`. A session scanning `Bin64/` alone would wrongly conclude EAC is absent. Corrected location is in §5. Charter §3 unchanged — location only. |
 
 ---
 
 ## 14. Test / capture log
 
 A numbered, append-only log of every experiment run, its prediction, and its
-result — so no test is silently retried and no result is remembered wrong. Empty
-at project start.
+result — so no test is silently retried and no result is remembered wrong.
 
 | #   | Test / capture | Prediction | Result |
 | --- | -------------- | ---------- | ------ |
@@ -840,11 +908,11 @@ at project start.
 | 3 | `openssl ciphers -s -v 'ECDHE-RSA-AES256-GCM-SHA384'` on the actual target machine (Garuda, OpenSSL 3.6.4). | Cipher still listed at default seclevel. | **Confirmed.** Listed, `TLSv1.2 Kx=ECDH Au=RSA Enc=AESGCM(256) Mac=AEAD`. |
 | 4 | Compile `t4_openssl_probe.cpp` on the target machine: **clang 22, OpenSSL 3.6.4**, `-std=c++14`. | 0 errors, the same 3 deprecation warnings. | **Confirmed exactly.** 0 errors; 3 warnings (`ERR_load_BIO_strings`, `ERR_load_SSL_strings`, `DTLSv1_2_method`). Crypto-library question for T4 step 5 is closed. Side result: clang 22 accepts `-std=c++14` on this TU without complaint — a first, narrow data point for step 1. |
 | 5 | `clang++ -std=c++14 -Wno-error -c AzCore/Math/Vector3.cpp -I AzCore -I AzCore/Platform/Linux` on clang 18. | Clean, or errors from removed C++14-era features (which would trigger `/opt/llvm14`). | **Falsified, and in an unexpected direction.** First a missing include dir surfaced (`Platform/Common/SIMD`), then 7 errors — but of a *different kind* than predicted: a dropped libstdc++ transitive include and a clang strictness change, not removed language features. `/opt/llvm14` not needed. |
-| 6 | Same TU, add `-include utility`, then `-fdelayed-template-parsing`. | Both are flag-fixable; no edits to Amazon's tree needed. | **Confirmed.** 7 → 5 → 0 errors. No source edits required, so the charter's version-locking rule stays satisfied. |
+| 6 | Same TU, add `-include utility`, then `-fdelayed-template-parsing`. | Both are flag-fixable; no edits to Amazon's tree needed. | **Confirmed at the time, and the second half was later falsified.** 7 → 5 → 0 errors. The "no source edits required" conclusion was wrong: the fork's `TypeInfo.h` was subsequently patched and committed. See §13. |
 | 7 | Same TU, `-std=c++14` plus both fix flags. | Clean. | **Falsified.** 1 error: `Crc.inl:114`, `auto` template parameter requires C++17. This is what killed the C++14 claim — see §13. |
 | 8 | `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w` on `AzCore/Math/Vector3.cpp`, target machine, clang **22**. | Clean, matching clang 18. | **Confirmed.** exit 0, no diagnostics. Recipe holds across four clang majors, so it is not an artifact of one compiler build. |
 | 9 | Same recipe on `AzCore/Math/Sfmt.cpp` (pulls `std/parallel/lock.h` + `Module/Environment.h`), clang 22. | Clean — though `Module/Environment.h` was flagged as the likelier to break, being the most platform-conditional. | **Confirmed, prediction held.** exit 0. AZStd threading and the allocator/environment bootstrap both compile under the recipe. |
-| 10 | Compile every AzCore TU (202, excluding Windows/Apple/Android/Tests) with the step-1 recipe. | Some genuine failures on the AZStd or EBus surface. | **Confirmed clean.** 168 built, 34 failed, and **every** failure is `file not found` for rapidjson (27), Lua (6), rapidxml (1). All are Lumberyard 3rdParty absent from the repo; none are on GridMate's dependency surface. `libazcore.a`, 31M, 168 objects. |
+| 10 | Compile every AzCore TU (202, excluding Windows/Apple/Android/Tests) with the step-1 recipe. | Some genuine failures on the AZStd or EBus surface. | **Confirmed clean.** 168 built, 34 failed, and **every** failure is `file not found` for rapidjson (27), Lua (6), rapidxml (1). All are Lumberyard 3rdParty absent from the repo; none are on GridMate's dependency surface. `libazcore.a`, 31M, 168 objects. Triage by error-kind grouping via `triage.sh`. |
 | 11 | Compile all 41 Linux GridMate TUs with the same recipe plus `-DDTLS1_RT_HEARTBEAT=24`. | A few failures on the platform layer. | **41/41, zero failures.** `libgridmate.a`, 4.9M. Step 3 done. |
 | 12 | Link `nwly_carrier_probe.cpp` against both archives with `-lssl -lcrypto -lpthread -ldl`. | Undefined symbols, probably from the gmock/zstd objects in the archive. | **Confirmed, linked first try.** No undefined symbols; archive semantics mean unreferenced objects are never pulled. |
 | 13 | Run the linked probe. | Runs. | **Falsified — segfault.** `IAllocator::GetAllocationSource()` on a null allocator: `OSAllocator` did not exist when `azmalloc` supplied `SystemAllocator`'s heap. Found with ASan. See §7 trap 1. |
@@ -854,7 +922,7 @@ at project start.
 | 17 | Build the probe with `Certificates.cpp` and `SecureSocketDriver` on both `CarrierDesc`s; run it. | Failure somewhere in Amazon's untested Linux DTLS path. | **Falsified — passed first run.** Handshake completed, payload round-tripped both ways, 201 of 2000 updates, identical to plaintext. Reproduced on clang 18 and on the target clang 22. See §13. |
 | 18 | Capture the `--secure` session and re-run the §8 Carrier decoder over it. | Carrier framing no longer visible. | **Confirmed.** 0/30 parse as Carrier; 30/30 parse as DTLS 1.2 ApplicationData at epoch 1. |
 | 19 | Search the `--secure` capture for the literal payload string. | Absent if encryption is real. | **Confirmed absent — 0 datagrams.** This, not the PASS line, is what establishes the traffic is actually encrypted. |
-| 20 | Rebuild archives from scratch after `build/` was deleted, re-run plaintext capture. | Byte-identical traffic. | **Confirmed.** Datagram 2 reproduced exactly (`00 02 a0 00 05 03 ...`). The build is reproducible from the pinned commit; `build/` is safe to delete. |
+| 20 | Rebuild archives from scratch after `build/` was deleted, re-run plaintext capture. | Byte-identical traffic. | **Confirmed.** Datagram 2 reproduced exactly (`00 02 a0 00 05 03 ...`). The build is reproducible; `build/` is safe to delete. **Scope caveat added later:** reproducible from the *patched* fork tree, not from bare `413ecaf` — see §13. |
 | 21 | Decode a `--secure` capture taken from before the session opens. | ApplicationData only, as in the earlier mid-session capture. | **Richer than expected.** Caught the full cookie exchange at epoch 0: ClientHello (DTLS1.2) / HelloVerifyRequest (DTLS**1.0**) / ClientHello with the 20-byte cookie echoed. Confirms §7's pre-T4 reading of the `HandshakeHeader`. See §9. |
 | 22 | Search the `--secure` capture for the literal payload string, on the target machine. | Absent. | **Confirmed, 0 matches.** Note `grep -c` exits 1 on a zero count, so the shell reports an error on success — the count is the result, not the exit code. |
 | 23 | T1: `strings` fingerprint of `NewWorld.exe` for engine family. Predicted GridMate (2016 LY origin). | GridMate present, O3DE absent. | **Confirmed.** 43 GridMate hits incl. `TransportLayerGridMate`; the sole O3DE hit was the gameplay struct `TransformLinkConnectionData`. Crypto fell out: OpenSSL 1.1.1k, static, `SSL_read`/`SSL_write`. Protobuf in the game binary. §10. |
@@ -863,4 +931,5 @@ at project start.
 | 26 | D2: test whether EOCD counts of 65535 are 16-bit saturation, by walking `PK\x01\x02` records directly. | Saturated; 2250 is a floor and the true count is higher. | **Falsified.** `walked == eocd` on every pak. No Zip64. 2250 exact. `-part12`/`-part13` are 22-byte empty-archive stubs; `-part14` has 3928 entries and 0 datasheets. |
 | 27 | D2: build new-world-tools `@e51c79a9` natively on Garuda and extract method-15 (Oodle) entries. | Fails — MSVC/PE-DLL dependency forces Proton. | **Falsified.** `go build` clean; runtime `dlopen` of a native Oodle v2.9.13 (+ `libtexconv.so`), both auto-downloaded on first run. Extraction succeeded. Note: the tool fetches binaries from the network — relevant to any air-gapped re-run. |
 | 28 | D2: bulk-extract every `.datasheet` and compare against the independent census. | 2250, matching the central-directory count. | **Confirmed.** `pak-extracter` produced exactly 2250 → 2250 JSON. Two independent code paths agree, so neither is silently dropping entries. 198 of 2250 stored (method 0), 2052 Oodle. |
-| | 29 | Enumerate every module in `Bin64/` and check against §10's static-linkage claim, which rested on a `find` returning empty. | No `*ssl*`/`*crypto*` module; inventory otherwise unremarkable. | **Confirmed, and richer than predicted.** 22 files, no crypto module — linkage claim now positive rather than absence-based. Three unanticipated findings: `vivoxsdk.dll` (second network stack, contaminates T3), no `steamnetworkingsockets` (weak evidence against SDR), `libcds-amd64-vcv141.dll` unidentified. |
+| 29 | Enumerate every module in `Bin64/` and check against §10's static-linkage claim, which rested on a `find` returning empty. | No `*ssl*`/`*crypto*` module; inventory otherwise unremarkable. | **Confirmed, and richer than predicted.** 22 files, no crypto module — linkage claim now positive rather than absence-based. Three unanticipated findings: `vivoxsdk.dll` (second network stack, contaminates T3), no `steamnetworkingsockets` (weak evidence against SDR), `libcds-amd64-vcv141.dll` unidentified. |
+| 30 | Check whether the Lumberyard fork tree is modified, after a recovered `CMakeLists.txt` comment referenced a "TypeInfo.h patch" that §7 and test #6 said did not exist. `git status --short` + `rg -n 'false_v' .../RTTI/TypeInfo.h`. | Tree clean and unmodified; the CMake comment is stale. | **Falsified — the tree is patched.** `false_v<>` at lines 161/169/177/185/193 (Amazon's original is `false_v<T>`), with a **clean** `git status`, so the patch is committed. §5's pin `413ecaf` does not describe the tree that built. See §13. Open: record the patch commit hash; determine whether `-fdelayed-template-parsing` is still needed. |
