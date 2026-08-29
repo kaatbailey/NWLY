@@ -144,6 +144,7 @@ Proton — record which once T3/H1 establish the working setup.
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M) |
 | Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Probe result below. |
+| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 22 (T4 step 1). See §7 for why each flag is there. |
 | Ghidra project              | `<path>`                              |
 | Capture output              | `<path>`                              |
 
@@ -285,6 +286,47 @@ across six minor versions rather than resting on one. Re-run
 
 ---
 
+### Verified AzCore toolchain recipe — clang 22, C++17, three flags (T4 step 1)
+
+CONFIRMED by compiling AzCore TUs on the target machine. Run from
+`dev/Code/Framework`:
+
+```
+clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c \
+  AzCore/AzCore/Math/Vector3.cpp -o /dev/null \
+  -I AzCore -I AzCore/Platform/Linux
+```
+
+0 errors, 0 warnings on `Math/Vector3.cpp` (leaf: Math only) and on
+`Math/Sfmt.cpp` (pulls `std/parallel/lock.h` + `Module/Environment.h`, so the
+AZStd threading reimplementation and the allocator/environment bootstrap are
+both covered). Test-log #5–#9.
+
+**Why each flag, so none of them get dropped as cargo cult:**
+
+| Flag | Without it | Cause |
+| ---- | ---------- | ----- |
+| `-std=c++17` | `Math/Crc.inl:114: 'auto' not allowed in template parameter until C++17` | The source is *not* C++14. See correction §13. |
+| `-include utility` | `std/utils.h:45: no member named 'exchange' in namespace 'std'` | `using std::exchange;` relied on a transitive `<utility>` that modern libstdc++ no longer pulls in. |
+| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. |
+| `-w` | ~31 warnings under C++14 | Cosmetic only, and 0 under C++17 anyway. Drop it if you want to read them. |
+
+**Decision: do NOT provision `/opt/llvm14`.** §7's earlier plan was to fall back
+to LLVM 14 on real compile errors. Real errors did occur — but none were removed
+language features. Both are toolchain drift with a flag-level fix and **no edits
+to Amazon's tree**, which keeps the charter's version-locking rule satisfied.
+Three flags beat carrying a second 2022 toolchain for the life of the project.
+
+**Third include path, undocumented in the §7 list.**
+`Platform/Linux/AzCore/Math/Internal/MathTypes_Linux.h` includes
+`Platform/Common/SIMD/AzCore/Math/Internal/MathTypes_SIMD.h` by a path relative
+to `dev/Code/Framework/AzCore`. It is satisfied by `-I AzCore` alone, so no
+fourth `-I` is needed — **but `Platform/Common/` must exist in the checkout.**
+A sparse checkout that omits it fails with a confusing "file not found" that
+points at the *Linux* header rather than the missing one.
+
+---
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -302,6 +344,7 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — STATE §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. The original bullet is left in place per append-only — read it together with this row and §7's recipe subsection. |
 | "OpenSSL 3.x will break `SecureSocketDriver.cpp` at T4 step 5 — expect removed 1.0.2-era APIs (custom `BIO_METHOD`, `HMAC_CTX_init`, opaque-struct breaks)." Raised in session, never promoted past UNVERIFIED. | **WRONG.** The file is already 1.1.0-era API. Compiles with 0 errors / 3 deprecation warnings on OpenSSL 3.0.13; DTLS 1.2 handshake completes with the shipped certs. Cause of the error: predicted from Lumberyard's release date instead of reading the file. Two tells were visible in the source the whole time (`X509_get0_notBefore`, `BIO_s_mem`). Lesson is charter §4 verbatim — *prefer the source to the sample*. |
 
 ---
@@ -318,4 +361,9 @@ at project start.
 | 2 | Live DTLS 1.2 handshake (`openssl s_server`/`s_client`) using the `Certificates.cpp` cert+key and the hardcoded `ECDHE-RSA-AES256-GCM-SHA384`, OpenSSL 3.0.13. | Rejected on security level or cipher policy. | **Prediction falsified.** `Protocol: DTLSv1.2`, `Cipher: ECDHE-RSA-AES256-GCM-SHA384`, `Verify return code: 0 (ok)`. |
 | 3 | `openssl ciphers -s -v 'ECDHE-RSA-AES256-GCM-SHA384'` on the actual target machine (Garuda, OpenSSL 3.6.4). | Cipher still listed at default seclevel. | **Confirmed.** Listed, `TLSv1.2 Kx=ECDH Au=RSA Enc=AESGCM(256) Mac=AEAD`. |
 | 4 | Compile `t4_openssl_probe.cpp` on the target machine: **clang 22, OpenSSL 3.6.4**, `-std=c++14`. | 0 errors, the same 3 deprecation warnings. | **Confirmed exactly.** 0 errors; 3 warnings (`ERR_load_BIO_strings`, `ERR_load_SSL_strings`, `DTLSv1_2_method`). Crypto-library question for T4 step 5 is closed. Side result: clang 22 accepts `-std=c++14` on this TU without complaint — a first, narrow data point for step 1. |
+| 5 | `clang++ -std=c++14 -Wno-error -c AzCore/Math/Vector3.cpp -I AzCore -I AzCore/Platform/Linux` on clang 18. | Clean, or errors from removed C++14-era features (which would trigger `/opt/llvm14`). | **Falsified, and in an unexpected direction.** First a missing include dir surfaced (`Platform/Common/SIMD`), then 7 errors — but of a *different kind* than predicted: a dropped libstdc++ transitive include and a clang strictness change, not removed language features. `/opt/llvm14` not needed. |
+| 6 | Same TU, add `-include utility`, then `-fdelayed-template-parsing`. | Both are flag-fixable; no edits to Amazon's tree needed. | **Confirmed.** 7 → 5 → 0 errors. No source edits required, so the charter's version-locking rule stays satisfied. |
+| 7 | Same TU, `-std=c++14` plus both fix flags. | Clean. | **Falsified.** 1 error: `Crc.inl:114`, `auto` template parameter requires C++17. This is what killed the C++14 claim — see §13. |
+| 8 | `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w` on `AzCore/Math/Vector3.cpp`, target machine, clang **22**. | Clean, matching clang 18. | **Confirmed.** exit 0, no diagnostics. Recipe holds across four clang majors, so it is not an artifact of one compiler build. |
+| 9 | Same recipe on `AzCore/Math/Sfmt.cpp` (pulls `std/parallel/lock.h` + `Module/Environment.h`), clang 22. | Clean — though `Module/Environment.h` was flagged as the likelier to break, being the most platform-conditional. | **Confirmed, prediction held.** exit 0. AZStd threading and the allocator/environment bootstrap both compile under the recipe. |
 | NWLY repo (local)           | `~/Documents/NWLY` |

@@ -50,6 +50,16 @@ instrument the whole project leans on (CHARTER §2).
   cert both clear modern security-level policy. See STATE §7 and test-log #1–3.
   Confirm with `clang++ -std=c++14 -c t4_openssl_probe.cpp -o /dev/null`
   before step 5; that is the entire check.
+- **STEP 1 IS DONE. Use this recipe, do not re-derive it.** From
+  `dev/Code/Framework`:
+  `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`
+  Verified 0 errors / 0 warnings on clang 22 for `Math/Vector3.cpp` and
+  `Math/Sfmt.cpp`. **The source is C++17, not C++14** — `Math/Crc.inl:114` uses
+  an `auto` template parameter. `-include utility` and
+  `-fdelayed-template-parsing` fix a dropped libstdc++ transitive include and a
+  clang strictness change respectively; both are toolchain drift, neither needs
+  a source edit. **Do not provision `/opt/llvm14`** — that decision is closed.
+  Keep `Platform/Common/` in the checkout. See STATE §7 and test-log #5–#9.
 - **Test certs exist:** `dev/Code/Framework/GridMate/Tests/Certificates.cpp` defines
   `g_untrustedCertPEM` / `g_untrustedPrivateKeyPEM`. Compile that file to resolve the
   `extern`s DTLS needs.
