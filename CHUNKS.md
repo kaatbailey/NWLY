@@ -72,7 +72,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 |       | Chunk                                        | Depends on | Deliverable                             |
 | ----- | -------------------------------------------- | ---------- | --------------------------------------- |
 | `[ ]` | **D1** Signature-scan harness                | —          | Offsets survive a client patch          |
-| `[ ]` | **D2** Client game-data extraction (`.datasheet`) | —      | Parallel track; needed to serve content |
+| `[x]` | **D2** Client game-data extraction (`.datasheet`) | —      | Parallel track; needed to serve content |
 
 ### Suggested order
 
@@ -469,9 +469,7 @@ Write the full prompt when the chunk comes up, using the shape above.
   when P1/P3/P4 resolve.
 - **D1 Signature-scan harness.** So offsets survive a client patch. Worth building
   the moment H3 has more than one hardcoded offset.
-- **D2 Client game-data extraction.** New World ships game data as `.datasheet`
-  files inside its pak archives; community tools exist. Parallel track — Track S
-  needs the data to serve anything. Low effort, do it early.
+- **D2 Client game-data extraction.** **DONE 2026-08-29** -- prompt in `D2_PROMPT.md`, findings in STATE §11. Paks are standard ZIP; compression method 15 is Oodle. **2250 datasheets**, all in `SharedDataStrm-part{1..11}.pak` + base -- *not* `GameData.pak`, and there is no `assets/server/server.pak` in build 22469132 despite the tool README. Extracted and converted to JSON with localization applied via new-world-tools @ `e51c79a9`, built natively on Linux. Track S has its content source.
 
 ---
 

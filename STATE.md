@@ -136,7 +136,7 @@ Proton — record which once T3/H1 establish the working setup.
 
 | What                        | Path / value                          |
 | --------------------------- | ------------------------------------- |
-| Client build under test     | `<record exact version + kept installer>` |
+| Client build under test     | **New World: Aeternum**, appid 1063730, **buildid 22469132**, installdir `New World`, ~71.2 GiB. Installer/depot **NOT yet pinned** — see §11. |
 | Retail client binary        | `~/.steam/steam/steamapps/common/New World/Bin64/NewWorld.exe` (171 MB, unpacked). Steam build, OpenSSL 1.1.1k statically linked. |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, stock fork of aws/lumberyard, `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
 | Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
@@ -621,6 +621,138 @@ Charter §3 — not touched, not analysed.
 
 ---
 
+## 11. Client game data (`.datasheet`) — CONFIRMED from D2
+
+Folded from FINDINGS — D2 — 2026-08-29. Pure offline file work: no client
+launch, no injection, read-only against the install (CHARTER §3 satisfied).
+
+**Build under test:** New World: Aeternum, Steam appid 1063730, **buildid
+22469132**, installdir `New World`, SizeOnDisk 76,416,676,920 (~71.2 GiB), at
+`/home/kaatlev/.local/share/Steam/steamapps/common/New World`.
+
+### The pak container is standard ZIP
+
+- `50 4b 03 04` at offset 0; the first local header parses cleanly — 41 bytes
+  stored, filename length 0x24 = `libs/flownodes/flownodeblacklist.xml`.
+- **130 `.pak`** under `assets/`, ~72G on disk, naming `<Name>[-partN].pak`.
+  All 130 open as zip; **0 failures**.
+- **Compression method 15 = Oodle.** Not a standard ZIP method id (0 store,
+  8 deflate, 9 deflate64, 12 bzip2, 14 LZMA, 93 zstd). Python `zipfile` can
+  enumerate method-15 entries but cannot `read()` them — it is a census tool
+  here, not an extraction tool.
+- **No Zip64 anywhere.** EOCD 16-bit entry counts are genuine, not saturated:
+  a direct `PK\x01\x02` central-directory walk gave `walked == eocd` on
+  every pak, including the four sitting exactly on 65535. The packer rolls to
+  a new `-partN` at the 65535 ceiling — that is what the part numbering is
+  for. See §13 and §14 for the falsified saturation hypothesis.
+
+### Where the datasheets are
+
+**2250 total**, confined entirely to `SharedDataStrm*`. `GameData.pak` holds
+none, despite the name (§13).
+
+| Pak | Datasheets |
+| --- | ---------- |
+| `SharedDataStrm-part6.pak` | 645 |
+| `SharedDataStrm-part4.pak` | 628 |
+| `SharedDataStrm-part5.pak` | 569 |
+| `SharedDataStrm-part7.pak` | 152 |
+| `SharedDataStrm-part9.pak` | 60 |
+| `SharedDataStrm-part8.pak` | 45 |
+| `SharedDataStrm-part11.pak` | 45 |
+| `SharedDataStrm-part10.pak` | 37 |
+| `SharedDataStrm-part3.pak` | 29 |
+| `SharedDataStrm-part1.pak` | 21 |
+| `SharedDataStrm.pak` | 12 |
+| `SharedDataStrm-part2.pak` | 7 |
+
+- `-part12` and `-part13` are **22-byte empty-archive stubs** (EOCD record
+  only, 0 entries). `-part14` has 3928 entries and 0 datasheets.
+- **198 of 2250 are stored (method 0); 2052 are Oodle.**
+
+### Verification
+
+- **Two independent code paths agree on 2250** — the hand-rolled
+  central-directory census and `pak-extracter`. Neither is silently dropping
+  entries.
+- **Verified column-by-column**, not by file count.
+  `MasterItemDefinitions_Faction`: **127 columns × 4121 rows**, legible
+  headers (`ItemID`, `ItemType`, `TradingCategory`, `GearScoreOverride`,
+  `PerkSlot1`). Not plausible-looking garbage, which is the D2 prompt's named
+  failure mode.
+- **Localization is a separate 184-file tree** under `localization/en-us`.
+  Datasheet string fields are `@Key` lookups (e.g. `@DyeB179_Name`) resolved
+  by the converter's `-localization` flag.
+
+### Tooling (re-derivable per CHARTER §4)
+
+- **github.com/new-world-tools/new-world-tools**, MIT, pure Go, v0.13.10,
+  commit **`e51c79a9af4fba51daecd97c5e190c0b5ee953a5`**
+  (Wed Nov 5 04:04:28 2025 +0300), cloned to `~/Documents/new-world-tools`.
+- Builds natively on Garuda with `go build -o ./bin/ ./cmd/...` — produces
+  `pak-extracter`, `datasheet-converter`, `object-stream-converter`,
+  `asset-catalog-parser`. No wine, no cgo.
+- **The tool downloads binary libraries from the network on first run** —
+  Oodle v2.9.13 and `libtexconv.so`, `dlopen`ed via `ebitengine/purego`.
+  Not found under the repo, `~/.cache`, `~/.local/share` or `~/.config` at
+  depth 5; **location unresolved**. Matters for any air-gapped or
+  reproducible re-run.
+- The tool README documents `assets/server/server.pak` as the datasheet
+  source. **That path does not exist in this build** (§13).
+
+**The recipe:**
+
+```fish
+set -g NW /home/kaatlev/.local/share/Steam/steamapps/common/"New World"
+cd ~/Documents/new-world-tools && go build -o ./bin/ ./cmd/...
+
+./bin/pak-extracter -input $NW/assets -output ~/Documents/nwly-extract \
+  -include '\.datasheet$' -threads 6
+./bin/pak-extracter -input $NW/assets -output ~/Documents/nwly-extract \
+  -include '^localization/en-us' -threads 6
+./bin/datasheet-converter -input ~/Documents/nwly-extract \
+  -output ~/Documents/nwly-datasheets -format json -threads 6 \
+  -localization ~/Documents/nwly-extract/localization/en-us -keep-structure
+```
+
+Runtimes: extract **540ms** (peak 7.5Mb) · convert **15.4s** (peak
+**2297Mb** — the converter is the memory hog, worth knowing on a smaller box).
+
+Outputs, gitignored and outside the repo (CHARTER §3 — not redistributed):
+`~/Documents/nwly-extract` (211M raw), `~/Documents/nwly-datasheets`
+(499M JSON, 2250 files).
+
+### UNVERIFIED — the loose ends
+
+- **No installer/depot pinned.** buildid 22469132 *identifies* this build but
+  will not re-download it. Manifest ids are in
+  `~/.local/share/Steam/depotcache/` or the appmanifest's `InstalledDepots`
+  block. **Pin them before the next game patch** (CHARTER §4 version-lock).
+  This is the only item here with a clock on it.
+- That the `-partN` split is *driven by* the 65535 ceiling. Consistent with
+  every count observed, but correlation. Tested by whether a future build
+  exceeds it.
+- Whether datasheet *schemas* are stable across builds. Governs how much
+  Track S work a patch invalidates.
+
+### Noticed, out of scope
+
+- `object-stream-converter` (slices, timelines, `.*db`, AZCS) and
+  `asset-catalog-parser` ship in the same toolkit and would likely say a lot
+  about the replicated-object model — **that is P5, not D2.** Recorded, not
+  acted on, per the CHUNKS shared preamble.
+- Nothing anti-cheat-adjacent was encountered or pursued.
+
+### What this unblocks
+
+Track S has its content source. The item/vitals/ability tables are
+server-authoritative content (gear score bounds, perk slots, base vitals) —
+what S2/S3 need. **Nothing here bears on T1–T5**; the transport track is
+unaffected.
+
+---
+
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -644,6 +776,11 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 | "Step 2 is understated — expect an explicit `AllocatorInstance` bootstrap in `main()` just to get AzCore compiling." Raised in session. | **WRONG about the phase, right about the trap.** Compiling AzCore needs no bootstrap at all: 168/202 TUs build with the plain step-1 recipe and every failure is a missing 3rdParty header. The bootstrap is a *runtime* requirement and it surfaced exactly at step 4, as a segfault in a binary that linked cleanly. See §7. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — STATE §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. The original bullet is left in place per append-only — read it together with this row and §7's recipe subsection. |
 | "OpenSSL 3.x will break `SecureSocketDriver.cpp` at T4 step 5 — expect removed 1.0.2-era APIs (custom `BIO_METHOD`, `HMAC_CTX_init`, opaque-struct breaks)." Raised in session, never promoted past UNVERIFIED. | **WRONG.** The file is already 1.1.0-era API. Compiles with 0 errors / 3 deprecation warnings on OpenSSL 3.0.13; DTLS 1.2 handshake completes with the shipped certs. Cause of the error: predicted from Lumberyard's release date instead of reading the file. Two tells were visible in the source the whole time (`X509_get0_notBefore`, `BIO_s_mem`). Lesson is charter §4 verbatim — *prefer the source to the sample*. |
+| "D2 datasheets will be in `assets/GameData.pak`" — inferred from the name before looking. | **WRONG.** `GameData.pak` holds zero. All 2250 are in `SharedDataStrm-part{1..11}.pak` + base. Cause of the error: inferred location from a filename instead of reading the central directory. A census across all 130 paks settles it in one pass and should have been step one. |
+| "new-world-tools' documented path `assets/server/server.pak` is the datasheet source." — taken from the tool README. | **STALE for build 22469132.** No `assets/server/` directory exists in this install. The README predates the Aeternum relaunch. A session following it verbatim stalls here; go by the census, not the README. |
+| "EOCD entry counts of exactly 65535 are 16-bit saturation, so the 2250 datasheet count is a floor." — raised in session on seeing four paks report 65535. | **WRONG.** A direct `PK\x01\x02` central-directory walk gave `walked == eocd` on every pak including all four. No Zip64 anywhere. 2250 is exact. The `-partN` split exists precisely to stay under the 65535 ceiling. Reasonable suspicion, wrong conclusion — and the check was cheap. |
+| "Oodle (ZIP method 15) needs the MSVC redistributable, so Linux extraction is Proton-or-nothing." — inferred from the tool README listing MSVC as a dependency. | **WRONG.** `go-oodle-lz` + `ebitengine/purego` `dlopen` a **native** Oodle v2.9.13 fetched at first run. No wine, no PE DLL, no cgo. Built and extracted clean on Garuda. Cause of the error: read a dependency note written for the Windows release binaries and assumed it described the source. |
+| "645 datasheets extracted in 173ms is suspiciously fast — likely a silent failure." — raised in session. | **WRONG.** Output verified column-by-column: `MasterItemDefinitions_Faction`, 127 columns × 4121 rows, legible headers. Oodle is simply that fast. Worth the check regardless — it is the D2 prompt's named failure mode — but speed alone was not evidence of anything. |
 
 ---
 
@@ -678,4 +815,8 @@ at project start.
 | 21 | Decode a `--secure` capture taken from before the session opens. | ApplicationData only, as in the earlier mid-session capture. | **Richer than expected.** Caught the full cookie exchange at epoch 0: ClientHello (DTLS1.2) / HelloVerifyRequest (DTLS**1.0**) / ClientHello with the 20-byte cookie echoed. Confirms §7's pre-T4 reading of the `HandshakeHeader`. See §9. |
 | 22 | Search the `--secure` capture for the literal payload string, on the target machine. | Absent. | **Confirmed, 0 matches.** Note `grep -c` exits 1 on a zero count, so the shell reports an error on success — the count is the result, not the exit code. |
 | 23 | T1: `strings` fingerprint of `NewWorld.exe` for engine family. Predicted GridMate (2016 LY origin). | GridMate present, O3DE absent. | **Confirmed.** 43 GridMate hits incl. `TransportLayerGridMate`; the sole O3DE hit was the gameplay struct `TransformLinkConnectionData`. Crypto fell out: OpenSSL 1.1.1k, static, `SSL_read`/`SSL_write`. Protobuf in the game binary. §10. |
-
+| 24 | D2: identify the pak container from header bytes of `assets/GameData.pak`. | Standard ZIP, magic `50 4b 03 04` at offset 0. | **Confirmed.** `50 4b 03 04`; first local header parses (41 bytes stored, name len 0x24 = `libs/flownodes/flownodeblacklist.xml`). All 130 paks open as zip, 0 failures. |
+| 25 | D2: locate the `.datasheet` files across all 130 paks. | In `GameData.pak`, by name inference. | **Falsified.** Zero in `GameData.pak`. All 2250 in the `SharedDataStrm*` family; part6=645, part4=628, part5=569 carry 82% of them. See §13. |
+| 26 | D2: test whether EOCD counts of 65535 are 16-bit saturation, by walking `PK\x01\x02` records directly. | Saturated; 2250 is a floor and the true count is higher. | **Falsified.** `walked == eocd` on every pak. No Zip64. 2250 exact. `-part12`/`-part13` are 22-byte empty-archive stubs; `-part14` has 3928 entries and 0 datasheets. |
+| 27 | D2: build new-world-tools `@e51c79a9` natively on Garuda and extract method-15 (Oodle) entries. | Fails — MSVC/PE-DLL dependency forces Proton. | **Falsified.** `go build` clean; runtime `dlopen` of a native Oodle v2.9.13 (+ `libtexconv.so`), both auto-downloaded on first run. Extraction succeeded. Note: the tool fetches binaries from the network — relevant to any air-gapped re-run. |
+| 28 | D2: bulk-extract every `.datasheet` and compare against the independent census. | 2250, matching the central-directory count. | **Confirmed.** `pak-extracter` produced exactly 2250 → 2250 JSON. Two independent code paths agree, so neither is silently dropping entries. 198 of 2250 stored (method 0), 2052 Oodle. |
