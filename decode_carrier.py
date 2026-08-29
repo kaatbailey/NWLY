@@ -170,7 +170,12 @@ def decode(payload):
 def read_pcap(path):
     try:
         r = subprocess.run(
-            ["tshark", "-r", path, "-Y", "udp", "-T", "fields",
+            # --disable-protocol dtls is REQUIRED. Without it tshark dissects
+            # secure captures as DTLS and leaves data.data empty, so every real
+            # frame vanishes and only the 1-byte wakeups survive. Plaintext
+            # captures are unaffected (no dissector claims them).
+            ["tshark", "-r", path, "--disable-protocol", "dtls",
+             "-Y", "udp", "-T", "fields",
              "-e", "udp.srcport", "-e", "udp.dstport", "-e", "data.data"],
             capture_output=True, text=True, check=True)
     except FileNotFoundError:
@@ -203,23 +208,57 @@ def main():
         sys.exit("No UDP payloads found in that capture.")
 
     print(f"{len(pkts)} datagrams with payload\n")
-    ok_count = 0
+
+    # Classify every datagram, not just the ones printed. Counting only the
+    # printed window, or counting wakeup bytes as successes, produces a false
+    # PASS on a capture where nothing real was decoded at all.
+    n_wake = n_dtls = n_carrier = n_bad = 0
+    for _, _, p in pkts:
+        if len(p) == 1 and p[0] == WAKEUP:
+            n_wake += 1
+        elif as_dtls(p):
+            n_dtls += 1
+        elif decode(p)[1]:
+            n_carrier += 1
+        else:
+            n_bad += 1
+
     for i, (sp, dp, payload) in enumerate(pkts[:args.max]):
         print(f"=== #{i}  {sp} -> {dp}  {len(payload)} bytes ===")
         print("  raw:", payload.hex(" "))
-        lines, ok = decode(payload)
-        print("\n".join(lines))
-        ok_count += ok
+        print("\n".join(decode(payload)[0]))
         print()
 
-    shown = min(args.max, len(pkts))
-    print(f"{ok_count}/{shown} decoded cleanly against the layout read from Carrier.cpp.")
-    if ok_count == shown:
-        print("Source and wire agree. Step 4 completion criterion met.")
+    real = n_dtls + n_carrier + n_bad
+    print(f"{len(pkts)} datagrams: {n_carrier} Carrier, {n_dtls} DTLS, "
+          f"{n_wake} wakeup, {n_bad} undecodable")
+
+    if real == 0:
+        print()
+        print("NOTHING REAL DECODED -- only wakeup bytes reached the decoder.")
+        print("This is almost always tshark's dissector hiding the payload, not an")
+        print("empty capture. Check the raw bytes are there:")
+        print("  tshark -r <pcap> --disable-protocol dtls -T fields -e data.data | head")
+        sys.exit(1)
+
+    if n_bad:
+        print()
+        print(f"{n_bad} datagram(s) did not decode. Either the layout reading is wrong,")
+        print("or they are a variant (compression hint / ack block) not covered here.")
+        print("Record which, and check Carrier.cpp GenerateDataGram.")
+        sys.exit(1)
+
+    print()
+    if n_dtls and not n_carrier:
+        print("SECURE capture: every real datagram is a DTLS record and none parse as")
+        print("Carrier framing. The transport is encrypted -- but confirm the payload")
+        print("string is absent too; record type alone does not prove that.")
+    elif n_carrier and not n_dtls:
+        print("PLAINTEXT capture: every real datagram decodes against the layout read")
+        print("from Carrier.cpp. Source and wire agree.")
     else:
-        print("Some datagrams did not decode. Either the layout reading is wrong,")
-        print("or those frames are a variant (compression hint / ack block) not yet")
-        print("covered here. Record which, and check Carrier.cpp GenerateDataGram.")
+        print("MIXED capture: both Carrier and DTLS framing present. Expected only")
+        print("mid-handshake; otherwise check the drivers were set on both CarrierDescs.")
 
 
 if __name__ == "__main__":

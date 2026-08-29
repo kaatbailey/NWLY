@@ -87,7 +87,11 @@ if command -v tshark >/dev/null; then
     echo "$COUNT datagrams captured"
     echo
     echo "first 6 payloads (UDP data only, hex):"
-    tshark -r "$PCAP" -T fields -e udp.srcport -e udp.dstport -e data.data \
+    # --disable-protocol dtls: without it tshark claims secure frames and
+    # data.data comes back empty, so the summary shows len=0 for every real
+    # datagram. Harmless for plaintext captures.
+    tshark -r "$PCAP" --disable-protocol dtls \
+        -T fields -e udp.srcport -e udp.dstport -e data.data \
         2>/dev/null | head -6 | while IFS=$'\t' read -r sp dp hex; do
             printf "  %s->%s len=%s\n     %s\n" \
                 "$sp" "$dp" "$(( ${#hex} / 2 ))" \
