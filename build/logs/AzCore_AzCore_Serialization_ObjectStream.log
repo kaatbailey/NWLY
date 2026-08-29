@@ -1,0 +1,5 @@
+In file included from AzCore/AzCore/Serialization/ObjectStream.cpp:26:
+AzCore/AzCore/XML/rapidxml.h:20:10: fatal error: 'rapidxml/rapidxml.h' file not found
+   20 | #include <rapidxml/rapidxml.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+1 error generated.

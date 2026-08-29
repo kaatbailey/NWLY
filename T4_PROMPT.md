@@ -50,6 +50,14 @@ instrument the whole project leans on (CHARTER §2).
   cert both clear modern security-level policy. See STATE §7 and test-log #1–3.
   Confirm with `clang++ -std=c++14 -c t4_openssl_probe.cpp -o /dev/null`
   before step 5; that is the entire check.
+- **STEPS 1-4 ARE DONE.** Archives build (`build_gridmate.sh`), the two-Carrier
+  plaintext session passes (`nwly_carrier_probe.cpp`), traffic is captured
+  (`capture_carrier.sh`) and the header layout is confirmed against it
+  (`decode_carrier.py`). See STATE §7, §8 and test-log #10-#16. **Only step 5
+  remains.** Add `-DDTLS1_RT_HEARTBEAT=24` to every GridMate compile — one
+  OpenSSL 3 removal, no source edit. Two runtime traps are already solved in the
+  probe: create `OSAllocator` before `SystemAllocator`, and scope EBus handlers
+  so they die before `GridMateDestroy`. Do not re-derive any of this.
 - **STEP 1 IS DONE. Use this recipe, do not re-derive it.** From
   `dev/Code/Framework`:
   `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`

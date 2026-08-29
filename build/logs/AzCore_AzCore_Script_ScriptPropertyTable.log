@@ -1,0 +1,4 @@
+AzCore/AzCore/Script/ScriptPropertyTable.cpp:20:13: fatal error: 'Lua/lualib.h' file not found
+   20 | #   include <Lua/lualib.h>
+      |             ^~~~~~~~~~~~~~
+1 error generated.

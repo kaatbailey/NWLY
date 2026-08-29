@@ -1,0 +1,8 @@
+In file included from AzCore/AzCore/Serialization/Json/IntSerializer.cpp:13:
+In file included from AzCore/AzCore/Serialization/Json/IntSerializer.h:15:
+In file included from AzCore/AzCore/Serialization/Json/BaseJsonSerializer.h:15:
+In file included from AzCore/AzCore/JSON/document.h:15:
+AzCore/AzCore/JSON/rapidjson.h:58:10: fatal error: 'rapidjson/rapidjson.h' file not found
+   58 | #include <rapidjson/rapidjson.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.

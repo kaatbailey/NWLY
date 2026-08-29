@@ -1,0 +1,5 @@
+In file included from AzCore/AzCore/Script/ScriptContext.cpp:19:
+AzCore/AzCore/Script/lua/lua.h:16:13: fatal error: 'Lua/lua.h' file not found
+   16 | #   include <Lua/lua.h>
+      |             ^~~~~~~~~~~
+1 error generated.

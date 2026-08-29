@@ -172,6 +172,24 @@ Compile it to answer "does the local OpenSSL match the API era this source
 assumes" in one step. Build line is in its header comment. Re-run it after any
 OpenSSL major upgrade; that is the whole point of keeping it.
 
+**`build_gridmate.sh`** — builds `libazcore.a` and `libgridmate.a` from the fork
+using the step-1 recipe. Writes nothing inside the Lumberyard tree; all output
+goes to `./build`. Incremental, parallel, and tolerant of the expected 3rdParty
+failures. `--ly` points at the fork, `--show-failures` lists what broke.
+
+**`nwly_carrier_probe.cpp`** — the T4 step-4 harness. Two Carriers on loopback,
+handshake, payload both ways, exit 0 on success. Path B: no gtest, no AzTest.
+Build line is in its header comment.
+
+**`capture_carrier.sh`** — runs the probe under tcpdump and writes
+`build/carrier_plaintext.pcap`. One command; handles the sudo and the start/stop
+sequencing.
+
+**`decode_carrier.py`** — decodes a capture against the Carrier layout read from
+`Carrier.cpp`. This is the step-4 completion check: it is the artefact that
+proves source and wire agree, and it is the starting point for diffing our
+traffic against retail.
+
 Otherwise nothing yet. This section fills as chunks complete. Each completed chunk's
 FINDINGS block folds into the relevant section here.
 
@@ -328,6 +346,125 @@ points at the *Linux* header rather than the missing one.
 
 ---
 
+### One real OpenSSL 3 removal: `DTLS1_RT_HEARTBEAT` (T4 step 3)
+
+`SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, which **does not exist
+in OpenSSL 3** — heartbeat support was removed after Heartbleed and the constant
+went with it. Fix is a define, no source edit:
+
+```
+-DDTLS1_RT_HEARTBEAT=24
+```
+
+24 (0x18) is the DTLS record type from the pre-1.1.0 headers. The only use is a
+`switch` label in a debug string helper that returns `"HeartBeat"`, so the value
+only has to match what a peer would put on the wire. See correction §13 — the
+earlier "OpenSSL 3.x is a non-issue" claim was too strong.
+
+---
+
+### Standalone bootstrap: two traps that only appear at runtime (T4 step 4)
+
+Neither is a compile error. Both segfault a binary that links fine. AzTest's
+environment does this work in the test builds, so `Tests/Tests.h` does **not**
+show either step — reading the fixture alone is not enough.
+
+**1. `OSAllocator` must be created before `SystemAllocator`.**
+`SystemAllocator`'s heap is supplied by an `azmalloc(..., AZ::OSAllocator)`, so
+`OSAllocator` has to exist first or that first call dereferences a null allocator
+inside `IAllocator::GetAllocationSource()`. Correct order:
+
+```cpp
+AZ::AllocatorInstance<AZ::OSAllocator>::Create();
+// ... build SystemAllocator::Descriptor, azmalloc the block ...
+AZ::AllocatorInstance<AZ::SystemAllocator>::Create(sysAllocDesc);
+IGridMate* gm = GridMateCreate(desc);
+AZ::AllocatorInstance<GridMateAllocatorMP>::Create(mpDesc);  // Carrier needs it
+```
+
+`GridMateAllocatorMP` is normally created by `StartMultiplayerService`. A probe
+that does not start a session service must create it by hand or Carrier has no
+allocator.
+
+**2. EBus handlers must be destroyed before `GridMateDestroy`.**
+A `CarrierEventBus::Handler` destructor calls `BusDisconnect()`, which touches
+the EBus context. Handlers left as plain locals of `main()` are destroyed *after*
+the allocator teardown, which is a use-after-free — found by ASan, invisible to a
+plain backtrace. Put everything that touches the bus in an explicit scope that
+closes before teardown.
+
+**Link line that works** (archives from `build_gridmate.sh`):
+`<probe>.cpp libgridmate.a libazcore.a -lssl -lcrypto -lpthread -ldl`
+Archive order matters. No undefined symbols — the gmock/zstd objects in
+`libazcore.a` are never pulled in, so no `-lgmock`/`-lzstd` is needed.
+
+---
+
+## 8. Wire format — CONFIRMED, GridMate Carrier (plaintext)
+
+Read from `GridMate/Carrier/Carrier.cpp` @ `413ecaf` and confirmed against a
+live loopback capture (test-log #15/#16). Layout came from the source first;
+the capture only confirmed it.
+
+**Byte order: big-endian throughout.** `kCarrierEndian = EndianType::BigEndian`,
+`Carrier.cpp:58`.
+
+```
+datagram := [seq u16] message+
+
+message  := [flags u8]
+            [dataSize u16]
+            [channel u8]      iff MF_DATA_CHANNEL
+            [numChunks u16]   iff MF_CHUNKS
+            [msgSeq u16]      iff NOT MF_SQUENTIAL_ID
+            [relSeq u16]      iff NOT MF_SQUENTIAL_REL_ID
+            [payload dataSize bytes]
+```
+
+Datagram header: `WriteDataGramHeader`, `Carrier.cpp:2869-2873` — a single
+sequence number, nothing else. Message header: `WriteMessageHeader`,
+`Carrier.cpp:3494-3541`. Flag bits, `Carrier.cpp:86-93`:
+
+| Bit | Value | Name |
+| --- | ----- | ---- |
+| 0 | 0x01 | `MF_RELIABLE` |
+| 1 | 0x02 | unused — must be 0 |
+| 2 | 0x04 | `MF_CHUNKS` |
+| 3 | 0x08 | `MF_SQUENTIAL_ID` |
+| 4 | 0x10 | `MF_SQUENTIAL_REL_ID` |
+| 5 | 0x20 | `MF_DATA_CHANNEL` |
+| 6 | 0x40 | unused — must be 0 |
+| 7 | 0x80 | `MF_CONNECTING` |
+
+**TRAP: the `MF_SQUENTIAL_*` flags are inverted.** Set means the value is implied
+by the previous message and is **absent from the wire**. Read them the intuitive
+way — set means present — and the parse desynchronises on the first multi-message
+datagram. Bits 1 and 6 being reserved gives a cheap desync check;
+`ReadMessageHeader` uses exactly that (`MF_UNUSED_FLAGS`) and so does
+`decode_carrier.py`.
+
+Multiple messages pack into one datagram. Confirmed example, 33 bytes:
+
+```
+00 02 a0 00 05 03 00 00 ff ff 00 00 00 01 01 88 00 06 ff ff
+00 00 00 01 01 01 88 00 02 ff ff 20 06
+
+seq=2
+  msg0 flags=0xa0 DATA_CHANNEL|CONNECTING size=5 channel=3 msgSeq=0 relSeq=65535
+  msg1 flags=0x88 SEQUENTIAL_ID|CONNECTING size=6 relSeq=65535   <- no msgSeq
+  msg2 flags=0x88 SEQUENTIAL_ID|CONNECTING size=2 relSeq=65535   <- no msgSeq
+```
+
+**Not Carrier protocol: the `'G'` wakeup byte.** A 1-byte datagram `0x47`
+addressed to the socket's *own* port is `AZ_SOCKET_WAKEUP_MSG_VALUE`
+(`SocketDriver.cpp:55`), sent by `StopWaitForData()` (lines 1449-1470) to break
+the receive thread out of its blocking wait; the receive side drops it as an
+internal wakeup (line 1423). **Filter it out before diffing against retail** or
+it looks like a phantom message type. Roughly a third of loopback frames are
+these.
+
+---
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -345,6 +482,8 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| "OpenSSL 3.x is a non-issue for `SecureSocketDriver.cpp`; modern OpenSSL needs no shim." — stated after the probe compiled clean, and written into §7. | **TOO STRONG.** `SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, removed from OpenSSL after Heartbleed. It compiles only with `-DDTLS1_RT_HEARTBEAT=24`. Cause of the error: `t4_openssl_probe.cpp` enumerates *function calls*, so a removed *macro constant* was invisible to it. The probe's conclusion was right about the API era and wrong about completeness. Lesson: a probe proves what it tests, not what it was designed to reassure about. |
+| "Step 2 is understated — expect an explicit `AllocatorInstance` bootstrap in `main()` just to get AzCore compiling." Raised in session. | **WRONG about the phase, right about the trap.** Compiling AzCore needs no bootstrap at all: 168/202 TUs build with the plain step-1 recipe and every failure is a missing 3rdParty header. The bootstrap is a *runtime* requirement and it surfaced exactly at step 4, as a segfault in a binary that linked cleanly. See §7. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — STATE §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. The original bullet is left in place per append-only — read it together with this row and §7's recipe subsection. |
 | "OpenSSL 3.x will break `SecureSocketDriver.cpp` at T4 step 5 — expect removed 1.0.2-era APIs (custom `BIO_METHOD`, `HMAC_CTX_init`, opaque-struct breaks)." Raised in session, never promoted past UNVERIFIED. | **WRONG.** The file is already 1.1.0-era API. Compiles with 0 errors / 3 deprecation warnings on OpenSSL 3.0.13; DTLS 1.2 handshake completes with the shipped certs. Cause of the error: predicted from Lumberyard's release date instead of reading the file. Two tells were visible in the source the whole time (`X509_get0_notBefore`, `BIO_s_mem`). Lesson is charter §4 verbatim — *prefer the source to the sample*. |
 
@@ -367,4 +506,11 @@ at project start.
 | 7 | Same TU, `-std=c++14` plus both fix flags. | Clean. | **Falsified.** 1 error: `Crc.inl:114`, `auto` template parameter requires C++17. This is what killed the C++14 claim — see §13. |
 | 8 | `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w` on `AzCore/Math/Vector3.cpp`, target machine, clang **22**. | Clean, matching clang 18. | **Confirmed.** exit 0, no diagnostics. Recipe holds across four clang majors, so it is not an artifact of one compiler build. |
 | 9 | Same recipe on `AzCore/Math/Sfmt.cpp` (pulls `std/parallel/lock.h` + `Module/Environment.h`), clang 22. | Clean — though `Module/Environment.h` was flagged as the likelier to break, being the most platform-conditional. | **Confirmed, prediction held.** exit 0. AZStd threading and the allocator/environment bootstrap both compile under the recipe. |
+| 10 | Compile every AzCore TU (202, excluding Windows/Apple/Android/Tests) with the step-1 recipe. | Some genuine failures on the AZStd or EBus surface. | **Confirmed clean.** 168 built, 34 failed, and **every** failure is `file not found` for rapidjson (27), Lua (6), rapidxml (1). All are Lumberyard 3rdParty absent from the repo; none are on GridMate's dependency surface. `libazcore.a`, 31M, 168 objects. |
+| 11 | Compile all 41 Linux GridMate TUs with the same recipe plus `-DDTLS1_RT_HEARTBEAT=24`. | A few failures on the platform layer. | **41/41, zero failures.** `libgridmate.a`, 4.9M. Step 3 done. |
+| 12 | Link `nwly_carrier_probe.cpp` against both archives with `-lssl -lcrypto -lpthread -ldl`. | Undefined symbols, probably from the gmock/zstd objects in the archive. | **Confirmed, linked first try.** No undefined symbols; archive semantics mean unreferenced objects are never pulled. |
+| 13 | Run the linked probe. | Runs. | **Falsified — segfault.** `IAllocator::GetAllocationSource()` on a null allocator: `OSAllocator` did not exist when `azmalloc` supplied `SystemAllocator`'s heap. Found with ASan. See §7 trap 1. |
+| 14 | Re-run with `OSAllocator` created first. | Runs. | **Falsified — use-after-free.** `Callbacks` destructors ran after allocator teardown, calling `BusDisconnect()` on a freed EBus context. Harness bug, not GridMate. See §7 trap 2. |
+| 15 | Re-run with EBus handlers in an explicit scope. | Session completes. | **PASS — T4 milestone.** Handshake, payload round-tripped both directions, clean teardown, exit 0, 201 of 2000 updates. Reproduced identically on clang 18 and on the target clang 22. |
+| 16 | Decode a live capture against the Carrier layout read from `Carrier.cpp`. | Layout matches, if it was read correctly. | **Confirmed.** All datagrams decode, consuming every byte with no trailing remainder. Multi-message datagrams confirm the inverted `MF_SQUENTIAL_*` semantics. 1-byte `0x47` frames identified from source as the SocketDriver wakeup, not protocol. §8. |
 
