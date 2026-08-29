@@ -50,6 +50,11 @@ instrument the whole project leans on (CHARTER §2).
   cert both clear modern security-level policy. See STATE §7 and test-log #1–3.
   Confirm with `clang++ -std=c++14 -c t4_openssl_probe.cpp -o /dev/null`
   before step 5; that is the entire check.
+- **T4 IS COMPLETE — ALL FIVE STEPS. This prompt is history, not a task list.**
+  Both modes pass: `carrier_probe` (plaintext) and `carrier_probe --secure`
+  (DTLS 1.2). Captures for each, and the header layouts confirmed from source in
+  STATE §8 and §9. Step 5's predicted Linux-path bugs did not exist (§13).
+  Nothing in this file needs re-deriving; read STATE §7-§9 instead.
 - **STEPS 1-4 ARE DONE.** Archives build (`build_gridmate.sh`), the two-Carrier
   plaintext session passes (`nwly_carrier_probe.cpp`), traffic is captured
   (`capture_carrier.sh`) and the header layout is confirmed against it

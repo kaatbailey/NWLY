@@ -69,6 +69,29 @@ def u16(b, o):
 
 WAKEUP = 0x47   # 'G', AZ_SOCKET_WAKEUP_MSG_VALUE, SocketDriver.cpp:55
 
+# DTLS record types (RFC 6347). Used only to recognise that a capture is
+# encrypted rather than to parse it -- once epoch > 0 the body is ciphertext.
+DTLS_RT = {20: "ChangeCipherSpec", 21: "Alert", 22: "Handshake", 23: "ApplicationData"}
+DTLS_HS = {0: "HelloRequest", 1: "ClientHello", 2: "ServerHello",
+           3: "HelloVerifyRequest", 11: "Certificate", 12: "ServerKeyExchange",
+           13: "CertificateRequest", 14: "ServerHelloDone", 15: "CertificateVerify",
+           16: "ClientKeyExchange", 20: "Finished"}
+
+
+def as_dtls(b):
+    """If b looks like a DTLS record, describe it. Header is 13 bytes:
+    type u8 | version u16 (0xfeff=1.0, 0xfefd=1.2) | epoch u16 | seq u48 | len u16
+    Matches the RecordHeader that SecureSocketDriver.cpp parses by hand."""
+    if len(b) < 13 or b[0] not in DTLS_RT or b[1] != 0xFE:
+        return None
+    ver = {0xFF: "1.0", 0xFD: "1.2"}.get(b[2], hex(b[2]))
+    epoch = int.from_bytes(b[3:5], "big")
+    length = int.from_bytes(b[11:13], "big")
+    d = f"DTLS{ver} {DTLS_RT[b[0]]} epoch={epoch} len={length}"
+    if b[0] == 22 and epoch == 0 and len(b) > 13:
+        d += f" {DTLS_HS.get(b[13], 'hs' + str(b[13]))}"
+    return d
+
 
 def decode(payload):
     """Returns (lines, ok). ok is False if the parse desynchronised."""
@@ -81,6 +104,13 @@ def decode(payload):
     # it, and exclude it when diffing against retail.
     if len(payload) == 1 and payload[0] == WAKEUP:
         return ["  SocketDriver self-wakeup byte ('G') -- not a Carrier datagram"], True
+
+    # A DTLS record means SecureSocketDriver is in use (T4 step 5). Records at
+    # epoch 0 are the cleartext handshake; epoch >= 1 is ciphertext and there is
+    # nothing further to decode without the session keys.
+    d = as_dtls(payload)
+    if d:
+        return [f"  {d} -- encrypted, not plaintext Carrier"], True
 
     if len(payload) < 2:
         return ["  too short for a datagram header"], False

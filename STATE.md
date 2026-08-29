@@ -181,9 +181,9 @@ failures. `--ly` points at the fork, `--show-failures` lists what broke.
 handshake, payload both ways, exit 0 on success. Path B: no gtest, no AzTest.
 Build line is in its header comment.
 
-**`capture_carrier.sh`** — runs the probe under tcpdump and writes
-`build/carrier_plaintext.pcap`. One command; handles the sudo and the start/stop
-sequencing.
+**`capture_carrier.sh`** — runs the probe under tcpdump. No args writes
+`build/carrier_plaintext.pcap`; `--secure` writes `build/carrier_dtls.pcap`.
+One command; handles the sudo and the start/stop sequencing.
 
 **`decode_carrier.py`** — decodes a capture against the Carrier layout read from
 `Carrier.cpp`. This is the step-4 completion check: it is the artefact that
@@ -465,6 +465,42 @@ these.
 
 ---
 
+## 9. Wire format — CONFIRMED, DTLS (SecureSocketDriver)
+
+With `SecureSocketDriver` installed on both `CarrierDesc`s, every datagram is a
+DTLS 1.2 record and the §8 Carrier framing moves inside the ciphertext. Record
+header is the 13-byte layout `SecureSocketDriver.cpp` parses by hand (the
+`RecordHeader` recorded pre-T4 in §7), now confirmed on the wire:
+
+```
+[type u8][version u16][epoch u16][sequence u48][length u16]  = 13 bytes
+   version 0xfeff = DTLS 1.0, 0xfefd = DTLS 1.2
+   type 20 ChangeCipherSpec | 21 Alert | 22 Handshake | 23 ApplicationData
+```
+
+**Epoch is the thing to read first.** Epoch 0 is the cleartext handshake and its
+handshake-type byte at offset 13 is readable. Epoch >= 1 is ciphertext: there is
+nothing further to parse without session keys, and no amount of staring at it
+will yield Carrier framing.
+
+Measured on a captured `--secure` session, against the plaintext baseline:
+
+| Check | plaintext | `--secure` |
+| ----- | --------- | ---------- |
+| parse as Carrier datagrams (§8) | 40/40 | **0** |
+| parse as DTLS 1.2 records | — | **30/30**, all epoch 1 |
+| contain the cleartext payload string | yes | **0** |
+| `'G'` wakeup bytes | ~1/3 of frames | 0 |
+
+The payload-string check is the one that matters: "PASS" only proves a session
+was established, not that anything was encrypted. Searching the capture for the
+known cleartext is what proves it. Keep that check in any future secure test.
+
+`decode_carrier.py` recognises both formats, so one tool identifies which mode a
+capture came from.
+
+---
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -482,6 +518,7 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
 | "OpenSSL 3.x is a non-issue for `SecureSocketDriver.cpp`; modern OpenSSL needs no shim." — stated after the probe compiled clean, and written into §7. | **TOO STRONG.** `SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, removed from OpenSSL after Heartbleed. It compiles only with `-DDTLS1_RT_HEARTBEAT=24`. Cause of the error: `t4_openssl_probe.cpp` enumerates *function calls*, so a removed *macro constant* was invisible to it. The probe's conclusion was right about the API era and wrong about completeness. Lesson: a probe proves what it tests, not what it was designed to reassure about. |
 | "Step 2 is understated — expect an explicit `AllocatorInstance` bootstrap in `main()` just to get AzCore compiling." Raised in session. | **WRONG about the phase, right about the trap.** Compiling AzCore needs no bootstrap at all: 168/202 TUs build with the plain step-1 recipe and every failure is a missing 3rdParty header. The bootstrap is a *runtime* requirement and it surfaced exactly at step 4, as a segfault in a binary that linked cleanly. See §7. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — STATE §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. The original bullet is left in place per append-only — read it together with this row and §7's recipe subsection. |
@@ -513,4 +550,8 @@ at project start.
 | 14 | Re-run with `OSAllocator` created first. | Runs. | **Falsified — use-after-free.** `Callbacks` destructors ran after allocator teardown, calling `BusDisconnect()` on a freed EBus context. Harness bug, not GridMate. See §7 trap 2. |
 | 15 | Re-run with EBus handlers in an explicit scope. | Session completes. | **PASS — T4 milestone.** Handshake, payload round-tripped both directions, clean teardown, exit 0, 201 of 2000 updates. Reproduced identically on clang 18 and on the target clang 22. |
 | 16 | Decode a live capture against the Carrier layout read from `Carrier.cpp`. | Layout matches, if it was read correctly. | **Confirmed.** All datagrams decode, consuming every byte with no trailing remainder. Multi-message datagrams confirm the inverted `MF_SQUENTIAL_*` semantics. 1-byte `0x47` frames identified from source as the SocketDriver wakeup, not protocol. §8. |
+| 17 | Build the probe with `Certificates.cpp` and `SecureSocketDriver` on both `CarrierDesc`s; run it. | Failure somewhere in Amazon's untested Linux DTLS path. | **Falsified — passed first run.** Handshake completed, payload round-tripped both ways, 201 of 2000 updates, identical to plaintext. Reproduced on clang 18 and on the target clang 22. See §13. |
+| 18 | Capture the `--secure` session and re-run the §8 Carrier decoder over it. | Carrier framing no longer visible. | **Confirmed.** 0/30 parse as Carrier; 30/30 parse as DTLS 1.2 ApplicationData at epoch 1. |
+| 19 | Search the `--secure` capture for the literal payload string. | Absent if encryption is real. | **Confirmed absent — 0 datagrams.** This, not the PASS line, is what establishes the traffic is actually encrypted. |
+| 20 | Rebuild archives from scratch after `build/` was deleted, re-run plaintext capture. | Byte-identical traffic. | **Confirmed.** Datagram 2 reproduced exactly (`00 02 a0 00 05 03 ...`). The build is reproducible from the pinned commit; `build/` is safe to delete. |
 

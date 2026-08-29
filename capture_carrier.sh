@@ -6,7 +6,8 @@
 # a summary. Replaces the two-terminal tcpdump dance.
 #
 # Usage, from anywhere:
-#   ./capture_carrier.sh
+#   ./capture_carrier.sh            plaintext -> build/carrier_plaintext.pcap
+#   ./capture_carrier.sh --secure   DTLS      -> build/carrier_dtls.pcap
 #
 # It will ask for your sudo password once: capturing packets needs root.
 # tcpdump producing no output is NORMAL -- it writes to the file, not the screen.
@@ -16,9 +17,15 @@ set -u
 NWLY="${NWLY:-$HOME/Documents/NWLY}"
 BUILD="$NWLY/build"
 PROBE="$BUILD/carrier_probe"
-PCAP="$BUILD/carrier_plaintext.pcap"
 
-echo "=== NWLY carrier capture ==="
+MODE="plaintext"
+PROBE_ARGS=()
+for a in "$@"; do
+    if [ "$a" = "--secure" ]; then MODE="dtls"; PROBE_ARGS=(--secure); fi
+done
+PCAP="$BUILD/carrier_${MODE}.pcap"
+
+echo "=== NWLY carrier capture ($MODE) ==="
 echo
 
 # ---- checks ---------------------------------------------------------------
@@ -56,7 +63,7 @@ echo "capturing on lo, ports 4427/4428 ..."
 echo
 
 # ---- run the probe --------------------------------------------------------
-"$PROBE"
+"$PROBE" "${PROBE_ARGS[@]}"
 PROBE_RC=$?
 echo
 
@@ -92,6 +99,10 @@ fi
 
 echo
 echo "probe exit code: $PROBE_RC"
-[ "$PROBE_RC" -eq 0 ] && echo "step 4 capture complete." \
-                      || echo "probe FAILED -- capture kept for diagnosis."
+if [ "$PROBE_RC" -eq 0 ]; then
+    echo "capture complete: $PCAP"
+    echo "decode it with:  ./decode_carrier.py $PCAP"
+else
+    echo "probe FAILED -- capture kept for diagnosis."
+fi
 exit "$PROBE_RC"

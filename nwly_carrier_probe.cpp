@@ -26,6 +26,14 @@
 #include <GridMate/Carrier/Carrier.h>
 #include <GridMate/Carrier/DefaultHandshake.h>
 #include <GridMate/Carrier/SocketDriver.h>
+#include <GridMate/Carrier/SecureSocketDriver.h>
+
+// Certificates.cpp defines these; it must be on the compile line.
+namespace Certificates
+{
+    extern const char* g_untrustedCertPEM;
+    extern const char* g_untrustedPrivateKeyPEM;
+}
 
 #include <cstdio>
 #include <cstring>
@@ -37,6 +45,13 @@ namespace
     const unsigned short kServerPort = 4428;
     const unsigned short kClientPort = 4427;
     const char* kPayload = "NWLY carrier probe payload";
+
+    // T4 step 5. Amazon never ran this path on Linux --
+    // AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER is undefined here, so the
+    // secure tests are compiled out on this platform. Failures below are
+    // GridMate-on-Linux findings, not crypto-library problems: the OpenSSL
+    // question is closed (STATE §7).
+    bool g_secure = false;
 
     // Catches connection events so we learn the ConnectionIDs the two sides
     // assign. Without this there is no way to address a Send().
@@ -93,9 +108,13 @@ namespace
     };
 }
 
-int main()
+int main(int argc, char** argv)
 {
-    std::printf("NWLY carrier probe -- two Carriers, plaintext, loopback\n");
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], "--secure") == 0) g_secure = true;
+
+    std::printf("NWLY carrier probe -- two Carriers, %s, loopback\n",
+                g_secure ? "DTLS (SecureSocketDriver)" : "plaintext");
 
     // ---- AzCore bootstrap -------------------------------------------------
     // A standalone binary gets none of what ComponentApplication normally does,
@@ -145,6 +164,28 @@ int main()
     // Disconnect detection adds keepalive traffic that muddies a first capture.
     serverDesc.m_enableDisconnectDetection = false;
     clientDesc.m_enableDisconnectDetection = false;
+
+    // Secure drivers must outlive the carriers; Carrier does not own them.
+    SecureSocketDriver* serverDriver = nullptr;
+    SecureSocketDriver* clientDriver = nullptr;
+    if (g_secure)
+    {
+        // Host presents the cert+key. Client trusts that same self-signed cert
+        // as its CA. Mirrors SecureDriverProvider in Tests/Carrier.cpp.
+        SecureSocketDesc hostSec;
+        hostSec.m_certificatePEM = Certificates::g_untrustedCertPEM;
+        hostSec.m_privateKeyPEM  = Certificates::g_untrustedPrivateKeyPEM;
+        serverDriver = aznew SecureSocketDriver(hostSec);
+        serverDesc.m_driver = serverDriver;
+
+        SecureSocketDesc joinSec;
+        joinSec.m_certificateAuthorityPEM = Certificates::g_untrustedCertPEM;
+        clientDriver = aznew SecureSocketDriver(joinSec);
+        clientDesc.m_driver = clientDriver;
+
+        // The DTLS handshake costs round trips on top of Carrier's own.
+        std::printf("  secure drivers created\n");
+    }
 
     Carrier* serverCarrier = DefaultCarrier::Create(serverDesc, gridMate);
     Carrier* clientCarrier = DefaultCarrier::Create(clientDesc, gridMate);
@@ -214,6 +255,8 @@ int main()
 
     DefaultCarrier::Destroy(clientCarrier);
     DefaultCarrier::Destroy(serverCarrier);
+    delete clientDriver;
+    delete serverDriver;
     }   // Callbacks destroyed here, while the EBus context is still alive.
 
     AZ::AllocatorInstance<GridMateAllocatorMP>::Destroy();
@@ -223,7 +266,10 @@ int main()
     AZ::AllocatorInstance<AZ::OSAllocator>::Destroy();
 
     const bool ok = (rc == 0) && clientGot && serverGot;
-    std::printf("%s\n", ok ? "PASS -- plaintext Carrier session established both ways"
-                           : "FAIL -- payload did not round-trip");
+    if (ok)
+        std::printf("PASS -- %s Carrier session established both ways\n",
+                    g_secure ? "DTLS" : "plaintext");
+    else
+        std::printf("FAIL -- payload did not round-trip\n");
     return ok ? 0 : 1;
 }
