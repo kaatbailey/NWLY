@@ -56,11 +56,19 @@ understand it.
 
 ## 2. Where things stand
 
+> **As of 2026-08-29:** the text below this line is the pre-T4 position and is
+> superseded. T1, T2, T4 and D2 are complete — see §7–§11 and the test log §14.
+> The next chunk is T3.
+
 Nothing is built yet, but the reference fork has been **read from source** (see §7)
 and that answered several questions T4 would otherwise have hit blind: the crypto is
 confirmed OpenSSL DTLS, the dependency surface is AzCore-only, the C++ standard is
 C++14, the Linux platform-header include paths are known, and the test harness +
 certs are located. The `T4_PROMPT.md` file is written and ready to run.
+
+You've also now got the two things this session was for: T4's toolchain question is settled
+ (-std=c++17, -include utility, the TypeInfo.h patch, system clang 22, no /opt/llvm14),
+ (- and that needs to land in STATE along with the §13 correction that "C++14" was wrong.
 
 The retail-client work (T1/T2 fingerprint) is still fully open and remains the thing
 that confirms whether the §7 reference facts survived into the shipped client.
@@ -140,7 +148,6 @@ Proton — record which once T3/H1 establish the working setup.
 | Retail client binary        | `~/.steam/steam/steamapps/common/New World/Bin64/NewWorld.exe` (171 MB, unpacked). Steam build, OpenSSL 1.1.1k statically linked. |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, stock fork of aws/lumberyard, `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
 | Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
-| Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M) |
 | Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Probe result below. |
@@ -148,6 +155,15 @@ Proton — record which once T3/H1 establish the working setup.
 | Ghidra project              | not yet created. RTTI survived (§10), so run the PE RTTI analyzer first — it recovers the ReplicaChunk class tree cheaply. |
 | Capture output              | `<path>`                              |
 | NWLY repo (local)           | `~/Documents/NWLY` |
+| Retail install path         | `/home/kaatlev/.local/share/Steam/steamapps/common/New World`. **`~/.steam/steam/...` is a symlink to this same directory** — the §5/§11 path difference was never a conflict. |
+| Pinned build                | buildid **22469132**, `LastUpdated` 1787844457 (2026-08-27). Depot 1063731 → manifest `5202358862838894766`; depot 1063732 → `5672526915328587099`; depot 1063730 → `4762214502346222814` (not in `InstalledDepots`, same update timestamp). appmanifest + 3 manifests + full `Bin64/` (272M, 22-file sha256 baseline) at `~/Documents/nwly-pin/22469132/`. Outside the repo, not committed (CHARTER §3). |
+| Pin caveat                  | Manifest ids are **documentation, not insurance** — `steam console` → `download_depot` only works while Valve's CDN retains those chunks, and old manifests are pruned. The `Bin64/` byte copy is the actual insurance; the 71G of paks are already reduced to `~/Documents/nwly-datasheets`. |
+| Patch-detection baseline    | `cd $NW; and sha256sum -c ~/Documents/nwly-pin/22469132/Bin64.sha256` lists exactly which binaries a patch touched. `Bin64/logs/` excluded (mutable, would false-positive on first launch). Seed for D1. |
+| Client runtime              | **Proton** — `steamapps/compatdata/1063730` exists. The retail client is a PE process under Wine on this host. Neutral for T3 (traffic exits `enp2s0` normally); a real complication for H1/H3, since Frida attaching inside Wine is a different problem from attaching natively. **Resolves the "Proton vs native still undecided" note below.** |
+| Capture interface           | **`enp2s0`**, host `192.168.1.33`, gateway `192.168.1.1`. Not `-i any` — avoids Linux-cooked (SLL) framing, so retail captures share `DLT_EN10MB` with the T4 loopback ones. |
+| Capture output              | `~/Documents/nwly-captures/` (gitignored). Reference captures remain in `build/*.pcap`. |
+| EasyAntiCheat location      | `New World/EasyAntiCheat/` (`EasyAntiCheat_EOS_Setup.exe`, `EOSSDK-Win32-Shipping.dll`, `EOSSDK-Win64-Shipping.dll`) — **a sibling of `Bin64/`, not inside it.** §10's mention could be read as implying `Bin64/`; a scan of `Bin64/` alone would wrongly conclude EAC is absent. Location only. CHARTER §3 — not touched. |
+
 
 Gotchas found so far:
 - **`fd` is not installed** on this machine; use `find`. `rg` (ripgrep) IS present.
@@ -618,6 +634,31 @@ Charter §3 — not touched, not analysed.
 - `find <Bin64> -iname '*ssl*' -o -iname '*crypto*' -o -iname '*eay*'` — the
   static-vs-dynamic linkage check (empty = static). Use `find`, not a shell
   glob; fish aborts a failed glob before the `or`.
+  
+  
+  ### `Bin64/` module inventory — 22 files, build 22469132
+
+Positive inventory, replacing §10's absence-based linkage argument:
+
+`NewWorld.exe` · `NewWorld.exe.eac` · `GameCrashUploader.exe` · `steam_api64.dll` ·
+`vivoxsdk.dll` · `bink2w64.dll` · `dbghelp.dll` · `libcds-amd64-vcv141.dll` ·
+`dstorage.dll` · `dstoragecore.dll` · `dxcompiler.dll` · `dxil.dll` ·
+`WinPixEventRuntime.dll` · `nvngx_dlss.dll` · `nvngx_dlssg.dll` ·
+`sl.dlss.dll` · `sl.dlss_g.dll` · `sl.common.dll` · `sl.interposer.dll` ·
+`sl.nis.dll` · `sl.pcl.dll` · `sl.reflex.dll`
+
+- **T2's static-linkage claim now rests on a list, not an empty `find`.** No `*ssl*`,
+  `*crypto*`, or `*eay*` module exists. Inline hook by signature confirmed as the
+  only H-track option.
+- **No `steamnetworkingsockets` / GameNetworkingSockets** — only `steam_api64.dll`,
+  the interface layer. Weak evidence against Steam Datagram Relay tunnelling the
+  game stream. **Absence argument only** — T3 settles it.
+- **`vivoxsdk.dll` is a second network stack in the same process.** Vivox opens its
+  own UDP media flow plus TCP signalling. It will appear in a T3 capture as a
+  sustained bidirectional UDP conversation that resembles a game stream and parses
+  as neither DTLS nor Carrier. Disable voice chat before capturing.
+- **`libcds-amd64-vcv141.dll` unidentified** (MSVC 2017 toolset, name suggests
+  Amazon-internal). Noted so H2 knows it exists before following xrefs.
 
 ---
 
@@ -770,6 +811,8 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| --------- | ------ |
+| §13 correction that "C++14" was wrong.
 | "RTTI is stripped from `NewWorld.exe` — no mangled names found." Said in session after the first scan's RTTI regex returned nothing. | **WRONG.** The regex only matched fully-formed `.?AV...@ns@@` symbols; the binary carries mangled-name *fragments* (`UEAAXPEAVReplicaChunkBase`, `AEBV...ReplicatedState`) that a stricter pattern missed. RTTI survived. Cause: judged absence from one narrow regex rather than a broad mangled-fragment search. Ghidra's RTTI analyzer will confirm and recover the class tree. |
 | "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
 | "OpenSSL 3.x is a non-issue for `SecureSocketDriver.cpp`; modern OpenSSL needs no shim." — stated after the probe compiled clean, and written into §7. | **TOO STRONG.** `SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, removed from OpenSSL after Heartbleed. It compiles only with `-DDTLS1_RT_HEARTBEAT=24`. Cause of the error: `t4_openssl_probe.cpp` enumerates *function calls*, so a removed *macro constant* was invisible to it. The probe's conclusion was right about the API era and wrong about completeness. Lesson: a probe proves what it tests, not what it was designed to reassure about. |
@@ -820,3 +863,4 @@ at project start.
 | 26 | D2: test whether EOCD counts of 65535 are 16-bit saturation, by walking `PK\x01\x02` records directly. | Saturated; 2250 is a floor and the true count is higher. | **Falsified.** `walked == eocd` on every pak. No Zip64. 2250 exact. `-part12`/`-part13` are 22-byte empty-archive stubs; `-part14` has 3928 entries and 0 datasheets. |
 | 27 | D2: build new-world-tools `@e51c79a9` natively on Garuda and extract method-15 (Oodle) entries. | Fails — MSVC/PE-DLL dependency forces Proton. | **Falsified.** `go build` clean; runtime `dlopen` of a native Oodle v2.9.13 (+ `libtexconv.so`), both auto-downloaded on first run. Extraction succeeded. Note: the tool fetches binaries from the network — relevant to any air-gapped re-run. |
 | 28 | D2: bulk-extract every `.datasheet` and compare against the independent census. | 2250, matching the central-directory count. | **Confirmed.** `pak-extracter` produced exactly 2250 → 2250 JSON. Two independent code paths agree, so neither is silently dropping entries. 198 of 2250 stored (method 0), 2052 Oodle. |
+| | 29 | Enumerate every module in `Bin64/` and check against §10's static-linkage claim, which rested on a `find` returning empty. | No `*ssl*`/`*crypto*` module; inventory otherwise unremarkable. | **Confirmed, and richer than predicted.** 22 files, no crypto module — linkage claim now positive rather than absence-based. Three unanticipated findings: `vivoxsdk.dll` (second network stack, contaminates T3), no `steamnetworkingsockets` (weak evidence against SDR), `libcds-amd64-vcv141.dll` unidentified. |
