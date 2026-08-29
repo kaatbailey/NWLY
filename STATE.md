@@ -193,7 +193,7 @@ dynamic work runs against the client **under Proton** (confirmed below).
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M). Local: `~/Documents/NWLY`. |
 | Toolchains                  | System **clang 22** (also used by PZMapMaker — do not disturb). `/opt/llvm14` was considered and **rejected** — see §7. |
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Reference build only; retail ships its own static 1.1.1k. |
-| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. **`-fdelayed-template-parsing` is now probably redundant** — the `7d4f1ee6` patch fixes the same five diagnostics at source, and `Vector3.cpp` compiles clean without it (test #32). Kept in the recipe until a full-build check confirms; see §7. |
+| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. **All four flags are required** — `-fdelayed-template-parsing` in particular is load-bearing and was briefly and wrongly believed redundant (§13, tests #32–#34). |
 | GridMate build recipe       | The AzCore recipe plus `-I GridMate -I GridMate/Platform/Linux` and **`-DDTLS1_RT_HEARTBEAT=24`**. See §7. |
 | Ghidra project              | Not yet created. RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
 
@@ -206,6 +206,14 @@ dynamic work runs against the client **under Proton** (confirmed below).
   successful "absent" check. The count is the result, not the exit code (test #22).
 - **fish aborts a failed glob before evaluating the `or`.** Use `find` for
   existence checks, not a shell glob (§10).
+- **`AzCore/std/containers/queue.h:202` has a typo in Amazon's source**
+  (`rhs.m_continer`, should be `m_container`). It is invisible under
+  `-fdelayed-template-parsing` and costs 108 compile failures without it. Do not
+  remove that flag. §7, §13.
+- **`triage.sh` and `build_gridmate.sh` enumerate different file sets** — 191/36
+  vs 202/41 — because triage picks up Android TUs the build script excludes. The
+  archives come from `build_gridmate.sh`; treat its counts as authoritative and
+  do not compare the two tools' numbers directly. Test #35.
 - **Disk:** single 1.9T nvme root (`/dev/nvme0n1p2`), ~591G free as of setup.
 - **Installed tooling:** Ghidra, `tcpdump`, Go, clang 22. **Still to add per
   chunk:** `wireshark-cli` (T3), Frida (H1), pev/radare2 (optional for H2).
@@ -412,29 +420,33 @@ both covered). Test-log #5–#9.
 | ---- | ---------- | ----- |
 | `-std=c++17` | `Math/Crc.inl:114: 'auto' not allowed in template parameter until C++17` | The source is *not* C++14. See correction §13. |
 | `-include utility` | `std/utils.h:45: no member named 'exchange' in namespace 'std'` | `using std::exchange;` relied on a transitive `<utility>` that modern libstdc++ no longer pulls in. |
-| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. **Superseded in practice by commit `7d4f1ee6`**, which patches the source to `false_v<>` and fixes the same five diagnostics — see the note below. |
+| `-fdelayed-template-parsing` | Two unrelated failure sets: (a) `RTTI/TypeInfo.h:161,169,177,185,193` ×5, and (b) **108 failures** from a one-character typo at `std/containers/queue.h:202` (`m_continer`) | Both are uninstantiated template bodies that modern clang parses eagerly where the 2019 clang did not. (a) is separately fixed at source by commit `7d4f1ee6`; **(b) is not fixed anywhere, so the flag stays.** See below. |
 | `-w` | ~31 warnings under C++14 | Cosmetic only, and 0 under C++17 anyway. Drop it if you want to read them. |
 
-**Two independent fixes now exist for the same five `TypeInfo.h` diagnostics:**
-the `-fdelayed-template-parsing` flag, and the `7d4f1ee6` source patch. Only one
-is needed. `AzCore/Math/Vector3.cpp` — the TU that originally surfaced the error —
-compiles **exit 0 without the flag** (test #32), so the patch alone is sufficient
-there.
+**`-fdelayed-template-parsing` is load-bearing, and here is exactly why.**
+`AzCore/std/containers/queue.h:202` contains a typo in Amazon's source:
 
-**UNVERIFIED across the full build.** One TU is not 209. The flag stays in the
-recipe until this comes back clean:
-
-```fish
-cd ~/Documents/lumberyard/dev/Code/Framework
-# edit triage.sh to drop -fdelayed-template-parsing, then:
-bash triage.sh azcore   # expect 168/202, same as test #10
-bash triage.sh gridmate # expect 41/41, same as test #11
+```cpp
+void swap(this_type& rhs)  {  AZStd::swap(m_container, rhs.m_continer); ... }
+//                                                         ^^^^^^^^^^ missing 'a'
 ```
 
-Matching counts mean the flag can come out of the recipe permanently. Any new
-failure means the flag is load-bearing somewhere `Vector3.cpp` doesn't reach, and
-it stays — which is also worth knowing, because it would mean the patch and the
-flag cover different sites.
+The member is `m_container` — every other line in the file spells it correctly.
+The typo sits in `priority_queue::swap()`, an uninstantiated template body, so
+under `-fdelayed-template-parsing` clang never parses it and the bug is invisible.
+That is how it survived Amazon's own builds. Without the flag, eager two-phase
+lookup finds it, and because `queue.h` is included nearly everywhere, **one
+character produces 108 compile failures across the tree.**
+
+Measured (test #34): flag off → 60/191 with 108 `no member named` errors. Flag on
+→ **151/191**, all 108 gone, remaining 40 are `file not found` only. The
+`7d4f1ee6` patch fixes five `static_assert` sites; the flag covers something far
+broader and neither substitutes for the other.
+
+**Do not remove this flag.** If a future toolchain drops
+`-fdelayed-template-parsing`, the fix is a one-character source patch to
+`queue.h:202` — the same shape as `7d4f1ee6`, and it would need the same
+read-from / built-from treatment in §5.
 
 **Decision: do NOT provision `/opt/llvm14`.** An earlier plan was to fall back to
 LLVM 14 on real compile errors. Real errors did occur — but none were removed
@@ -902,7 +914,8 @@ claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
-| "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Both follow-up actions are now closed (tests #31, #32):** the patch is commit **`7d4f1ee6`**, the only one on top of `413ecaf`, and it is pushed. §5 now carries a read-from / built-from pair. Test #20's reproducibility result holds for `7d4f1ee6`. `-fdelayed-template-parsing` is redundant on the TU that surfaced the error, but is kept pending a full-build check — see §7. |
+| "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Both follow-up actions are now closed (tests #31, #32):** the patch is commit **`7d4f1ee6`**, the only one on top of `413ecaf`, and it is pushed. §5 now carries a read-from / built-from pair. Test #20's reproducibility result holds for `7d4f1ee6`. `-fdelayed-template-parsing` was briefly believed redundant on the strength of this patch — **that was wrong, see the next row.** |
+| "`-fdelayed-template-parsing` is redundant now that `7d4f1ee6` patches `TypeInfo.h`." — inferred from `Vector3.cpp` compiling exit 0 without the flag (test #32). | **WRONG, and the probe was the problem.** The flag guards a *second, unrelated* defect: `std/containers/queue.h:202` reads `rhs.m_continer` where the member is `m_container` — a one-character typo in Amazon's source, inside `priority_queue::swap()`, an uninstantiated template body. `queue.h` is included nearly everywhere, so removing the flag costs **108 compile failures** (60/191 without, 151/191 with — tests #33, #34). `7d4f1ee6` fixes five `static_assert` sites and nothing else. **Cause of the error: `Vector3.cpp` is Math-only and never includes `queue.h`, so it could not have detected this.** Picking the TU that surfaced the *original* symptom felt like the right probe and was in fact the narrowest possible one. Lesson: a single-TU result generalises to the build only when the TU's include surface covers what is being tested. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. |
 | "RTTI is stripped from `NewWorld.exe` — no mangled names found." Said in session after the first scan's RTTI regex returned nothing. | **WRONG.** The regex only matched fully-formed `.?AV...@ns@@` symbols; the binary carries mangled-name *fragments* (`UEAAXPEAVReplicaChunkBase`, `AEBV...ReplicatedState`) that a stricter pattern missed. RTTI survived. Cause: judged absence from one narrow regex rather than a broad mangled-fragment search. Ghidra's RTTI analyzer will confirm and recover the class tree. |
 | "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
@@ -956,4 +969,7 @@ result — so no test is silently retried and no result is remembered wrong.
 | 29 | Enumerate every module in `Bin64/` and check against §10's static-linkage claim, which rested on a `find` returning empty. | No `*ssl*`/`*crypto*` module; inventory otherwise unremarkable. | **Confirmed, and richer than predicted.** 22 files, no crypto module — linkage claim now positive rather than absence-based. Three unanticipated findings: `vivoxsdk.dll` (second network stack, contaminates T3), no `steamnetworkingsockets` (weak evidence against SDR), `libcds-amd64-vcv141.dll` unidentified. |
 | 30 | Check whether the Lumberyard fork tree is modified, after a recovered `CMakeLists.txt` comment referenced a "TypeInfo.h patch" that §7 and test #6 said did not exist. `git status --short` + `rg -n 'false_v' .../RTTI/TypeInfo.h`. | Tree clean and unmodified; the CMake comment is stale. | **Falsified — the tree is patched.** `false_v<>` at lines 161/169/177/185/193 (Amazon's original is `false_v<T>`), with a **clean** `git status`, so the patch is committed. §5's pin `413ecaf` does not describe the tree that built. See §13. |
 | 31 | `git log --oneline 413ecaf..HEAD` in the fork — how much has accumulated on top of the pinned commit? | One commit, the `TypeInfo.h` patch. Possibly more, since nobody had looked. | **Confirmed, prediction held exactly.** Exactly one commit: **`7d4f1ee6`** *"AzCore: fix false_v<T> static_assert for modern clang (template-template param can't be a template arg)"*. `HEAD -> master, origin/master, origin/HEAD` — pushed, not local-only. §5 now records read-from (`413ecaf`) and built-from (`7d4f1ee6`) separately. Closes the §13 open action. |
-| 32 | Drop `-fdelayed-template-parsing` and compile `AzCore/Math/Vector3.cpp` — the TU that originally produced the five `TypeInfo.h` diagnostics (test #6). Is the flag still needed now the source is patched? | Exit 0 — the `7d4f1ee6` patch fixes the same diagnostics at source, making the flag redundant. | **Confirmed for this TU.** exit 0, no diagnostics. **Scope caveat: one TU is not 209.** The flag stays in the recipe until `triage.sh` runs clean without it across both libraries (expect 168/202 and 41/41, matching tests #10 and #11). Command in §7. |
+| 32 | Drop `-fdelayed-template-parsing` and compile `AzCore/Math/Vector3.cpp` — the TU that originally produced the five `TypeInfo.h` diagnostics (test #6). Is the flag still needed now the source is patched? | Exit 0 — the `7d4f1ee6` patch fixes the same diagnostics at source, making the flag redundant. | **Confirmed for this TU, and the conclusion drawn from it was wrong.** exit 0, no diagnostics. But `Vector3.cpp` is Math-only and never includes `std/containers/queue.h`, which is where the flag actually earns its keep — see #33/#34. A single-TU probe whose include surface does not cover the thing being tested. §13. |
+| 33 | Run `triage.sh` (which carries no `-fdelayed-template-parsing`) over AzCore, as a full-build version of #32. | 168/202, matching test #10 — i.e. the flag is redundant. | **Falsified, badly.** 60/191, with **108** `no member named X in X` failures. Two variables differed from #10 at once (flag absent *and* a different file set — 191 vs 202, `triage.sh` includes Android TUs that `build_gridmate.sh` excludes), so this run alone proved nothing. Reading the actual error text is what settled it. |
+| 34 | Add `-fdelayed-template-parsing` to `triage.sh` and re-run AzCore — change exactly one thing from #33. | The 108 `no member named` failures vanish; ~40 `file not found` remain. | **Confirmed exactly.** **151/191**, all 108 gone, remaining 40 are `file not found` only (jni.h, rapidjson, Lua, rapidxml). Root cause identified from the error text: `std/containers/queue.h:202` spells `rhs.m_continer` instead of `m_container` — one typo in an uninstantiated template body, invisible under delayed parsing, fatal without it. The flag is load-bearing. §7, §13. |
+| 35 | **OPEN — not yet run.** `triage.sh` enumerates 191 AzCore and 36 GridMate TUs; `build_gridmate.sh` enumerated 202 and 41 (tests #10, #11), and `triage.sh` picks up Android TUs (`APKFileHandler.cpp`, needs `jni.h`) that the recorded run excluded. Diff the two file-selection expressions. | The scripts' `find` predicates differ in platform exclusions; `build_gridmate.sh` is the one whose counts the archives were built from. | *Pending.* Does not affect the archives — `build_gridmate.sh` is unchanged and is what produced `libazcore.a`/`libgridmate.a`. Matters only so the two tools report comparable numbers. |

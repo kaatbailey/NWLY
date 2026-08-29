@@ -14,7 +14,7 @@ OUT=$(mktemp -d)
 TARGET="${1:-azcore}"
 
 FLAGS=(
-  -std=c++17 -Wno-error -include utility
+  -std=c++17 -Wno-error -include utility -fdelayed-template-parsing
   -Wno-deprecated-literal-operator -Wno-deprecated-declarations
   -Wno-unused-parameter -Wno-unused-variable
   -I "${AZCORE}" -I "${AZCORE}/Platform/Linux"

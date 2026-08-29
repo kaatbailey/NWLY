@@ -26,6 +26,7 @@
 | Capture interface | **`enp2s0`**, host `192.168.1.33`, gateway `192.168.1.1` |
 | Existing decoder | `decode_carrier.py` in `~/Documents/NWLY` — recognises both Carrier framing (§8) and DTLS records (§9) |
 | Shell | fish |
+| tshark | present (`HAVE-TSHARK`) |
 
 ---
 
@@ -69,18 +70,34 @@ downgrade, not a bug. Do not spend time on it.
 
 ## Steps
 
-### 1. Tooling
+### 1. Tooling and the build version string
 
 ```fish
-pacman -Qi wireshark-cli >/dev/null 2>&1; and echo HAVE-TSHARK; or echo NEED-TSHARK
-which tcpdump
+which tshark tcpdump
 ```
 
-If needed: `sudo pacman -S wireshark-cli`. `tcpdump` is already present (it is what
-`capture_carrier.sh` uses). Capture runs under `sudo tcpdump`, so no `wireshark`
-group membership is required.
+`tshark` is present; `tcpdump` is what `capture_carrier.sh` already uses. Capture
+runs under `sudo tcpdump`, so no `wireshark` group membership is required.
 
-### 2. Start the capture BEFORE the client connects
+**Record the exact client version string before capturing.** STATE §10 flags this
+as wanted before T5, and the launcher shows it. Note the version displayed on the
+New World launcher / title screen alongside buildid 22469132 — it is the human-
+readable pair to the Steam buildid and the thing a future patch will change.
+
+### 2. Silence the second network stack BEFORE launching
+
+`vivoxsdk.dll` (STATE §10) is voice chat, and it runs its **own** network stack in
+the same process: a sustained bidirectional UDP media flow plus TCP/HTTPS
+signalling. In a capture it looks a great deal like a game stream and parses as
+neither DTLS nor Carrier. Per CHARTER §4 (change one thing at a time), eliminate it
+at the source rather than filtering it out afterwards:
+
+- In the client's audio / voice settings, **turn voice chat off** before entering
+  the world.
+- If it cannot be fully disabled, its endpoints resolve under `*.vivox.com` — note
+  them from the capture and exclude by IP. Off is better than filtered.
+
+### 3. Start the capture BEFORE the client connects
 
 This is the single procedural detail that decides whether the chunk succeeds. Test
 #21 only caught the cookie exchange because the capture predated the session. A
@@ -95,7 +112,7 @@ sudo tcpdump -i enp2s0 -s 0 -n -w $PCAP
 Leave it running. Do not filter at capture time — filter offline, where a mistake
 costs nothing.
 
-### 3. Run a scripted session, noting wall-clock times
+### 4. Run a scripted session, noting wall-clock times
 
 Charter §4, one thing at a time. Write the times down; they are what makes the
 size/timing profile readable.
@@ -110,39 +127,60 @@ size/timing profile readable.
 7. Log out. Stop the capture with Ctrl-C.
 
 While in-world, in a second terminal, attribute the sockets directly rather than
-inferring them from the capture:
+inferring them from the capture. **Under Proton the process name is unreliable** —
+it may show as `wine64-preloa`, a truncated `NewWorld.exe`, or a numeric thread —
+so run the broad form first and read it yourself:
 
 ```fish
-ss -tunp | rg -i 'wine|NewWorld'
+ss -tunp                          # everything; find the New World sockets by eye
+ss -tunp | rg -i 'wine|NewWorld|proton'   # convenience filter, but trust the line above
 ```
 
-### 4. Identify the conversations
+Record the remote IP:port of every UDP flow that persists across the whole in-world
+window. Those are the game-stream candidates.
+
+### 5. Identify the conversations
 
 ```fish
 tshark -r $PCAP -q -z conv,udp | head -40
 tshark -r $PCAP -q -z conv,tcp | head -40
 ```
 
-The game stream is the UDP conversation with sustained bidirectional traffic across
-the whole in-world window — not the largest by bytes (that may be a Steam or CDN
-transfer). Cross-check against the `ss` output from step 3.
+**Expect three or four UDP conversations, not one:** the game stream, Vivox (if not
+fully disabled), EOSSDK/EAC, and Steam background traffic. The game stream is the
+UDP conversation with sustained bidirectional traffic across the whole in-world
+window — **not** the largest by bytes (that may be a Steam or CDN transfer).
+Cross-check against the `ss` output from step 4; that attribution is more reliable
+than guessing from traffic shape.
 
-### 5. Test P2 and P3
+Fix the game port in a variable once you have it — later steps use it:
 
 ```fish
-tshark -r $PCAP -Y 'dtls' -T fields \
+set -g GAMEPORT <port-from-above>
+```
+
+### 6. Test P2 and P3 — force the DTLS dissector
+
+**Wireshark's DTLS dissector is heuristic and will often not claim an arbitrary
+high UDP port on its own.** A bare `-Y 'dtls'` can therefore return nothing even
+when the traffic *is* DTLS — which would read as "P2 falsified" when the truth is
+"dissector never ran." Tell it the port explicitly with `-d`:
+
+```fish
+tshark -r $PCAP -d udp.port==$GAMEPORT,dtls -Y 'dtls' -T fields \
   -e ip.dst -e udp.dstport -e dtls.record.content_type -e dtls.record.version \
   | sort | uniq -c | sort -rn | head -20
 ```
 
 Expect content types 22 (Handshake) at version `0xfefd`/`0xfeff` early, then 23
-(ApplicationData) for the bulk.
+(ApplicationData) for the bulk. Only if this *also* comes back empty is P2 in
+doubt — and then fall back to the entropy profile.
 
-### 6. Test P4 — the one that matters
+### 7. Test P4 — the one that matters
 
 ```fish
-tshark -r $PCAP -Y 'dtls.handshake.type == 1' -T fields \
-  -e udp.dstport -e dtls.handshake.ciphersuite
+tshark -r $PCAP -d udp.port==$GAMEPORT,dtls -Y 'dtls.handshake.type == 1' \
+  -T fields -e udp.dstport -e dtls.handshake.ciphersuite
 ```
 
 Count the suites on one ClientHello. One suite, value `0xc030` → P4 confirmed.
@@ -150,7 +188,8 @@ Count the suites on one ClientHello. One suite, value `0xc030` → P4 confirmed.
 Then the cookie exchange:
 
 ```fish
-tshark -r $PCAP -Y 'dtls.handshake.type == 1 or dtls.handshake.type == 3' \
+tshark -r $PCAP -d udp.port==$GAMEPORT,dtls \
+  -Y 'dtls.handshake.type == 1 or dtls.handshake.type == 3' \
   -T fields -e frame.number -e dtls.handshake.type -e dtls.record.version \
   -e dtls.handshake.cookie
 ```
@@ -158,7 +197,7 @@ tshark -r $PCAP -Y 'dtls.handshake.type == 1 or dtls.handshake.type == 3' \
 Type 3 is HelloVerifyRequest. Expect its version to be `0xfeff` while both
 ClientHellos are `0xfefd`, and expect the cookie to be echoed verbatim.
 
-### 7. Run the existing decoder against retail
+### 8. Run the existing decoder against retail
 
 This is the point of the chunk — the instrument built in T4 pointed at retail for
 the first time.
@@ -174,18 +213,19 @@ link layer should match — but if the decoder hardcodes an offset or filters on
 `127.0.0.1`, that is where it breaks. That is a decoder bug, not a protocol finding.
 Fix and re-run; do not record it as evidence about retail.
 
-### 8. Size and timing profile
+### 9. Size and timing profile
 
 ```fish
-tshark -r $PCAP -Y "udp.port==<GAMEPORT>" -T fields \
+tshark -r $PCAP -Y "udp.port==$GAMEPORT" -T fields \
   -e frame.time_relative -e udp.length -e ip.src \
   > ~/Documents/nwly-captures/t3_sizes.tsv
 ```
 
 Report packet rate and size distribution separately for the stand-still window and
-the walking window. A ~30–60 Hz stream of small packets is the GridMate replica-delta
-shape. The delta between the two windows is a free head start on P3, but **do not
-decode anything** — that is P-track and it needs H3 plaintext anyway.
+the walking window (use the wall-clock times from step 4 to bound them). A ~30–60 Hz
+stream of small packets is the GridMate replica-delta shape. The delta between the
+two windows is a free head start on P3, but **do not decode anything** — that is
+P-track and it needs H3 plaintext anyway.
 
 ---
 
@@ -193,13 +233,15 @@ decode anything** — that is P-track and it needs H3 plaintext anyway.
 
 - Transport named (UDP vs TCP) for the world connection, with the port(s) and the
   server endpoint recorded.
+- The exact client version string recorded alongside buildid 22469132.
 - The auth/server-list phase separated from the game stream.
 - P1–P4 each marked confirmed or falsified, with the command output as evidence.
 - The epoch-0 handshake extracted and saved as its own artefact — this is the exact
   thing T5 diffs against the reference:
 
   ```fish
-  tshark -r $PCAP -Y 'dtls.record.epoch == 0' -w ~/Documents/nwly-captures/t3_handshake_epoch0.pcap
+  tshark -r $PCAP -d udp.port==$GAMEPORT,dtls -Y 'dtls.record.epoch == 0' \
+    -w ~/Documents/nwly-captures/t3_handshake_epoch0.pcap
   ```
 - Packet size / inter-arrival profile for the still and walking windows.
 - Whether `decode_carrier.py` handled retail unmodified, and any changes it needed.
@@ -219,12 +261,43 @@ decode anything** — that is P-track and it needs H3 plaintext anyway.
 
 ---
 
+## Watch for, and record if seen — interception recon (H-track, do not act)
+
+The standing ask across every chunk is to note where the plaintext boundary sits
+and how cleanly it can be reached, because that is what H1/H3 will exploit to read
+the stream after decryption. **This is reconnaissance only — record it in FINDINGS
+under "Noticed, out of scope (H-track recon)" and do not build on it in T3.** In a
+capture-only chunk the observable items are:
+
+- **`SSLKEYLOGFILE`.** If the client's statically-linked OpenSSL honours this
+  environment variable, it writes the session secrets to a file and Wireshark
+  decrypts the whole capture **with no hook at all** — the cheapest possible path
+  to plaintext. Stock OpenSSL 1.1.1 supports it, but it must be *compiled in*
+  (`SSL_CTX_set_keylog_callback` wired up), which a game may strip. One line tests
+  it: launch once with the variable set and see whether the file gets written.
+  Note the result; do not make it a dependency.
+- **Session resumption / tickets.** If the handshake resumes rather than doing a
+  full exchange, a fresh epoch-0 capture is not guaranteed every session — which
+  matters for both T5's input and any keylog approach.
+- **DTLS version or cipher drift from the reference** (see P4) — anything implying a
+  modified `SSL_CTX`, since that is also where a keylog callback would or would not
+  have been wired in.
+
+The general principle for the whole H-track, worth carrying forward: the retail
+OpenSSL is **static** (STATE §10), so the boundary functions `SSL_read` / `SSL_write`
+have no export to hook — H3 reaches them by **signature scan**, not symbol lookup.
+The plaintext is on the stack the instant those return; that is the interception
+point. `SSLKEYLOGFILE`, if present, gets there without touching the process at all.
+
+---
+
 ## FINDINGS to record
 
 Fold into STATE §5 (environment) and a new confirmed section for the retail
 transport. Include:
 
-- The exact build under test and the capture filename, in every claim.
+- The exact build under test, the version string, and the capture filename, in
+  every claim.
 - Server endpoint(s) and port(s), and whether they are stable across two sessions.
 - P1–P4 results with the evidence.
 - Which secure driver retail uses — `SecureSocketDriver` or
@@ -233,3 +306,4 @@ transport. Include:
 - The Proton-vs-native decision for dynamic tooling, now that the client is
   confirmed to run under Proton, and what that implies for H1's Frida setup.
 - Anything the decoder needed changed, so the next session does not rediscover it.
+- The H-track recon items above, kept separate from the transport findings.
