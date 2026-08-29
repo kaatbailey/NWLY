@@ -147,6 +147,7 @@ Proton — record which once T3/H1 establish the working setup.
 | AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 22 (T4 step 1). See §7 for why each flag is there. |
 | Ghidra project              | `<path>`                              |
 | Capture output              | `<path>`                              |
+| NWLY repo (local)           | `~/Documents/NWLY` |
 
 Gotchas found so far:
 - **`fd` is not installed** on this machine; use `find`. `rg` (ripgrep) IS present.
@@ -366,4 +367,4 @@ at project start.
 | 7 | Same TU, `-std=c++14` plus both fix flags. | Clean. | **Falsified.** 1 error: `Crc.inl:114`, `auto` template parameter requires C++17. This is what killed the C++14 claim — see §13. |
 | 8 | `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w` on `AzCore/Math/Vector3.cpp`, target machine, clang **22**. | Clean, matching clang 18. | **Confirmed.** exit 0, no diagnostics. Recipe holds across four clang majors, so it is not an artifact of one compiler build. |
 | 9 | Same recipe on `AzCore/Math/Sfmt.cpp` (pulls `std/parallel/lock.h` + `Module/Environment.h`), clang 22. | Clean — though `Module/Environment.h` was flagged as the likelier to break, being the most platform-conditional. | **Confirmed, prediction held.** exit 0. AZStd threading and the allocator/environment bootstrap both compile under the recipe. |
-| NWLY repo (local)           | `~/Documents/NWLY` |
+
