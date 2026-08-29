@@ -3,6 +3,14 @@
 Companion to `CHARTER.md` and `STATE.md`. This file holds the work breakdown and
 the ready-to-paste prompt for each chunk.
 
+> **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
+> Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
+> missing); the Standing environment notes filled in with real values; completed
+> chunks marked DONE with pointers into STATE; three claims inside the T4 prompt
+> marked SUPERSEDED per STATE §13; T3's scope narrowed to match the instrument
+> that now exists; the suggested order rewritten. Completed prompts are kept
+> verbatim as historical record — a DONE banner is added, the body is not deleted.
+
 ---
 
 ## How to run a chunk
@@ -24,6 +32,11 @@ will half-do all three and hand you back something none of them defined as done.
 must survive; the prompt is disposable. If a future session only reads one
 document, it should be the charter.
 
+**Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
+its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `D2_PROMPT.md`). Where one exists,
+**that file is authoritative** and the section here is a summary. Paste the file,
+not the summary.
+
 ---
 
 ## Chunk index
@@ -32,22 +45,33 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 ### Track T — Transport. Identify how the client secures and frames network data.
 
-|       | Chunk                                             | Depends on | Deliverable                                                              |
-| ----- | ------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
-| `[x]` | **T1** Engine fingerprint (static)                | —          | **A document.** GridMate vs O3DE-`AzNetworking` vs rewrite, with evidence |
-| `[x]` | **T2** Crypto-library fingerprint                 | —          | **A document.** OpenSSL / mbedTLS / CNG, and where the boundary is        |
-| `[ ]` | **T3** Transport recon (Wireshark, no hooks)      | —          | Transport, ports, packet-size and entropy profile                        |
-| `[x]` | **T4** Build the reference `Carrier` from the fork | —          | A two-process GridMate session we control, captured                       |
-| `[ ]` | **T5** Reference vs retail handshake diff          | T1, T4     | **The chunk that answers §1's core question.** Header layout, or a rewrite verdict |
+|       | Chunk                                             | Depends on   | Deliverable                                                              |
+| ----- | ------------------------------------------------- | ------------ | ------------------------------------------------------------------------ |
+| `[x]` | **T1** Engine fingerprint (static)                | —            | **DONE 2026-08-29.** GridMate confirmed. STATE §10                        |
+| `[x]` | **T2** Crypto-library fingerprint                 | —            | **DONE 2026-08-29.** OpenSSL 1.1.1k, static, `SSL_read`/`SSL_write`. STATE §10 |
+| `[ ]` | **T3** Transport recon (retail capture, no hooks) | —            | **NEXT.** Transport, ports, epoch-0 handshake, size/timing profile. Prompt: `T3_PROMPT.md` |
+| `[x]` | **T4** Build the reference `Carrier` from the fork | —           | **DONE 2026-08-29.** Plaintext + DTLS both pass and captured. STATE §7–§9 |
+| `[ ]` | **T5** Reference vs retail handshake diff         | T1, **T3**, T4 | **The chunk that answers §1's core question.** Header layout, or a rewrite verdict |
+
+> **T5's dependency on T3 was missing from this table until 2026-08-29.** T5 diffs
+> the reference epoch-0 handshake (T4, STATE §9) against the *retail* epoch-0
+> handshake, and the only source of the latter is T3's capture. T5 cannot start
+> before T3 lands.
 
 ### Track H — Hooking. Get to plaintext, framed messages. Proven on the reference build first.
 
 |       | Chunk                                          | Depends on | Deliverable                                                          |
 | ----- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------- |
 | `[ ]` | **H1** Frida crypto hook on the reference build | T2, T4     | `SSL_read`/`SSL_write` plaintext logged from a target we control     |
-| `[ ]` | **H2** Locate the dispatch point in retail (static) | T1, T5 | Ghidra: the message-type switch or handler table                    |
+| `[ ]` | **H2** Locate the dispatch point in retail (static) | T1, (T5) | Ghidra: the message-type switch or handler table                   |
 | `[!]` | **H3** Crypto/dispatch hook on retail           | H1, H2, T2 | Blocked on H1+H2. Raw bytes + timestamp + direction + conn-id to file |
 | `[ ]` | **H4** The reflection reader (`SerializeContext`) | T1       | **Decision gate + prototype.** Only if the ABI proves traversable    |
+
+> **H2 can start now.** Its hard input is T1, which is complete. T5 is only needed
+> for H2's *falsification* check at the end (does the xref chain resemble
+> `Carrier::Receive` → `ReplicaManager`), so H2 can run mostly blind and be
+> confirmed once T5 lands. It needs no login, no running client, and no live
+> servers — which makes it the fallback if T3 stalls.
 
 ### Track P — Protocol. What the messages mean. Built on captures, not guesses.
 
@@ -71,18 +95,23 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                        | Depends on | Deliverable                             |
 | ----- | -------------------------------------------- | ---------- | --------------------------------------- |
-| `[ ]` | **D1** Signature-scan harness                | —          | Offsets survive a client patch          |
-| `[x]` | **D2** Client game-data extraction (`.datasheet`) | —      | Parallel track; needed to serve content |
+| `[ ]` | **D1** Signature-scan harness                | —          | Offsets survive a client patch. **Head start:** `pins/22469132/Bin64.sha256` already answers "which binaries did this patch touch" (STATE §5) |
+| `[x]` | **D2** Client game-data extraction (`.datasheet`) | —      | **DONE 2026-08-29.** 2250 datasheets → JSON. STATE §11 |
 
-### Suggested order
+### Order — where the project actually is
 
-**T1 → T2 → T3 → T4 → T5**, then Track H opens. T1 first because the engine
-identity decides whether every later assumption (GridMate `Carrier`, DTLS,
-`SerializeContext`) even applies. T5 is the milestone: it answers the charter's
-one-sentence question — GridMate fork or rewrite.
+**T1, T2, T4 and D2 are complete.** The engine question is settled (GridMate), the
+crypto boundary is located (`SSL_read`/`SSL_write`, statically linked), the
+reference instrument is built and captured, and Track S has its content source.
 
-D2 (`.datasheet` extraction) runs in parallel from day one; it is low-effort,
-uses existing community tooling, and Track S needs the data to serve anything.
+**Next: T3 → T5.** T3 is the last input T5 needs. T5 is the milestone — it answers
+the charter's one-sentence question by diffing the retail epoch-0 handshake
+against the reference one.
+
+**Then Track H opens.** H2 can in fact run in parallel with T3 (see the note
+above) and is the fallback if T3 is blocked on account or server availability.
+
+D1 can start whenever; it has a free head start from the pin baseline.
 
 ---
 
@@ -106,26 +135,65 @@ Every prompt below assumes this, and every prompt written later must include it:
 > **The owner runs every command.** Give exact commands with real paths. Note the
 > exact client build under test in every capture — offsets and possibly the
 > protocol move between builds.
+>
+> **Keep the loop tight.** Predict → run **one** command → read the exact error →
+> fix → re-probe. Do not reason from memory across several turns without asking
+> for something to be run. This is what took T4 from "provision an isolated
+> toolchain" to "two flags and a five-line patch" in about twenty minutes.
 
 ### Standing environment notes
 
-<!-- Fill these as they cost time. Prior projects found these paid for themselves many times over. Examples of the shape: -->
+Filled 2026-08-29. Full detail in STATE §5; this is the working subset.
 
-- **Client build under test:** `<record the exact version + a kept installer path>`.
-- **Reference-build tree:** `<path to the Lumberyard fork; where Carrier/ lives>`.
-- **Ghidra project:** `<path>`. Run the PE RTTI analyzer on first import — mangled
-  `.?AV...@GridMate@@` names settle T1 on their own if RTTI survived.
+- **Client build under test:** New World: Aeternum, Steam appid **1063730**,
+  **buildid 22469132**, `LastUpdated` 2026-08-27. Installed at
+  `/home/kaatlev/.local/share/Steam/steamapps/common/New World`
+  (`~/.steam/steam/steamapps/...` is a symlink to the same place).
+  **Pinned** at `~/Documents/nwly-pin/22469132/` — depot manifests plus a byte
+  copy of `Bin64/` with a 22-file sha256 baseline.
+- **Client runs under Proton** (`steamapps/compatdata/1063730`). The retail client
+  is a PE process under Wine on this host. Neutral for packet capture; a real
+  complication for Frida in H1/H3.
+- **Reference-build tree:** `~/Documents/lumberyard`, branch `master`. GridMate at
+  `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`.
+  **The tree is patched** — `RTTI/TypeInfo.h` reads `false_v<>` where Amazon's
+  original reads `false_v<T>`, committed. The pin `413ecaf24d7a...` therefore does
+  **not** describe the tree that builds. See STATE §13.
+- **Build recipe:** `clang++ -std=c++17 -include utility -fdelayed-template-parsing -w`
+  with `-I AzCore -I AzCore/Platform/Linux`, run from `dev/Code/Framework`. GridMate
+  adds `-I GridMate -I GridMate/Platform/Linux -DDTLS1_RT_HEARTBEAT=24`.
+  Scripts: `build_gridmate.sh` (build), `triage.sh` (bulk compile triage),
+  `CMakeLists.txt` (CLion/clangd path).
+- **Capture interface:** `enp2s0`, host `192.168.1.33`, gateway `192.168.1.1`.
+  Not `-i any` — that yields Linux-cooked (SLL) framing and breaks link-layer
+  parity with the T4 loopback captures.
+- **Ghidra project:** not yet created. Run the PE RTTI analyzer on first import —
+  RTTI survived in `NewWorld.exe` (STATE §10), so it recovers the `ReplicaChunk`
+  class tree cheaply. This is H2's starting point.
 - **Frida vs compiled hook:** Frida for all exploration (reload JS without
   restarting). Move to a MinHook/Detours DLL writing to a named pipe only once the
-  hook target is known and stable.
+  hook target is known and stable. **Note:** retail runs under Proton, so H1/H3
+  must solve attaching to a PE process inside Wine.
 - **Never parse in the hook.** Log raw bytes + timestamp + direction + conn-id to a
   binary file; parse offline. You will re-parse the same capture many times.
+- **Shell gotchas:** fish. `fd` is not installed — use `find`. `grep -c` exits 1 on
+  a zero count, so a successful "absent" check looks like an error. fish aborts a
+  failed glob before evaluating the `or`, so use `find` for existence checks.
 
 ---
 
 # Track T prompts
 
-## T1 — Engine fingerprint (static)
+## T1 — Engine fingerprint (static) ✅ DONE 2026-08-29
+
+> **COMPLETE. Findings in STATE §10. Do not re-run.**
+> Verdict: **GridMate**, decisively — `TransportLayerGridMate` is New World's own
+> wrapper class, so GridMate is the live network layer. 43 GridMate-family hits.
+> O3DE `AzNetworking` absent; the single O3DE-looking hit was the gameplay struct
+> `TransformLinkConnectionData`, exactly the generic-name trap this prompt warned
+> about. Crypto fell out of the same scan (most of T2). Protobuf present in
+> `NewWorld.exe` — flagged for P2. RTTI survived.
+> Prompt kept below as historical record.
 
 **Deliverable is a document**, not code and not a hook.
 
@@ -172,7 +240,16 @@ those survive a rewrite.
 
 ---
 
-## T2 — Crypto-library fingerprint
+## T2 — Crypto-library fingerprint ✅ DONE 2026-08-29
+
+> **COMPLETE. Findings in STATE §10. Do not re-run.**
+> Verdict: **OpenSSL 1.1.1k (25 Mar 2021), statically linked.** Plaintext boundary
+> is `SSL_read` / `SSL_write`; `dtls1_` and `DTLSv1` confirm DTLS. Static linkage
+> is the harder of the two outcomes: **no DLL proxying is possible**, so the
+> H-track must use an inline hook located by signature and patched in memory.
+> The linkage claim now rests on a positive 22-file `Bin64/` inventory, not on an
+> empty `find` (STATE §10, test #29).
+> Prompt kept below as historical record.
 
 **Deliverable is a document.** Where is the plaintext boundary, and what function
 sits on it?
@@ -205,32 +282,78 @@ hook above, which changes the whole H-track.
 
 ---
 
-## T3 — Transport recon (Wireshark, no hooks)
+## T3 — Transport recon (retail capture, no hooks) ← NEXT
 
-**Deliverable: the transport profile.** Ten minutes of capture, no code in the
-client.
+> **The full ready-to-run prompt is `T3_PROMPT.md`. Paste that file, not this
+> summary.** What follows is the scope in brief, plus the reasons this chunk is
+> narrower than it was originally written.
 
-**Scope.** Wireshark on the host during a normal login-to-in-world session:
-- Transport and port range (UDP vs TCP; whether login/world-list is separate
-  HTTPS from the game stream).
-- Packet-size histogram and inter-arrival timing (a ~30–60Hz stream of small
-  packets = replica delta updates, the GridMate shape).
-- Shannon entropy of payloads over the session. Low-entropy opening packets then
-  ~7.9 bits/byte after = the handshake→encrypted transition, and it tells H-track
-  exactly which client function to break on.
+**Deliverable: the retail transport profile, and the retail epoch-0 handshake as
+its own artefact.** That artefact is T5's input.
 
-**Definition of done.** Transport named, port(s) recorded, the size/timing profile
-described, and the entropy transition point (if any) identified.
+**Scope is smaller than the original T3 text.** The original assumed recon from
+zero — entropy profiling, "is there crypto at all." That predates STATE §9 and
+`decode_carrier.py`, which already recognises both Carrier framing and DTLS
+records. So the primary analysis is **point the existing instrument at retail
+traffic**; entropy profiling is the fallback if it does not parse.
 
-**Falsification.** Predict UDP with a DTLS handshake before capturing. If entropy
-is low throughout, the plaintext may be on the wire and most of the H-track is
-unnecessary — say so.
+**It also settles a STATE §7 question:** GridMate ships two secure drivers —
+`SecureSocketDriver` (UDP/DTLS) and `StreamSecureSocketDriver` (TCP/TLS). Which
+one carries the persistent world connection decides the shape of every P-track
+chunk, and a capture answers it with no hooks.
 
-**Non-goals.** No decryption attempts. No hooks. No modifying traffic.
+**Predictions to record before capturing (CHARTER §4):**
+
+1. Game stream is **UDP**; auth and server-list are a separate TCP/443 phase.
+2. UDP payloads parse as **DTLS 1.2 records**, `decode_carrier.py` unmodified.
+3. Opening exchange is ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) →
+   ClientHello with cookie echoed. **The 1.0 HVR is correct**, RFC 6347 §4.2.1 —
+   not a downgrade, do not chase it.
+4. **The retail ClientHello advertises exactly one cipher suite, `0xC030`**
+   (`ECDHE-RSA-AES256-GCM-SHA384`), because GridMate hardcodes it at
+   `SecureSocketDriver.cpp:1494`.
+
+**Prediction 4 is the load-bearing one.** A single-suite ClientHello matching the
+reference is close to conclusive for a stock-ish GridMate transport, and it is
+readable at epoch 0 without a hook. A normal multi-suite list means Amazon
+replaced the `SSL_CTX` setup, and T5's verdict needs qualifying even though T1
+said GridMate.
+
+**Two procedural details that decide whether the chunk succeeds:**
+
+- **Start the capture before the client connects.** Test #21 only caught the
+  cookie exchange because of this. A mid-session capture is all epoch ≥ 1
+  ciphertext and useless for T5.
+- **Disable voice chat in the client first.** `vivoxsdk.dll` (STATE §10) opens its
+  own UDP media flow that resembles a game stream and parses as neither DTLS nor
+  Carrier. Eliminate it at the source rather than filtering it later.
+
+**Expect three or four UDP conversations, not one:** the game stream, Vivox (if not
+disabled), EOSSDK/EAC, and Steam background traffic. Attribute them with
+`ss -tunp` during the session rather than guessing from traffic shape.
+
+**Definition of done.** Transport named (UDP vs TCP) with ports and endpoints;
+auth phase separated from the game stream; predictions 1–4 each confirmed or
+falsified with command output as evidence; the epoch-0 handshake saved as its own
+pcap; size/timing profile for a stand-still window and a walking window; and
+whether `decode_carrier.py` handled retail unmodified.
+
+**Non-goals.** No hooks, no injection, no Frida. No decryption attempts — epoch ≥ 1
+is ciphertext and there is nothing there without session keys (STATE §9). No
+message-body decoding (P-track). **EAC/EOSSDK traffic will be in the capture** —
+identify its endpoints so they can be excluded, record nothing further about it.
+Charter §3. Do not modify traffic.
 
 ---
 
-## T4 — Build the reference `Carrier` from the fork
+## T4 — Build the reference `Carrier` from the fork ✅ DONE 2026-08-29
+
+> **COMPLETE. Findings in STATE §7, §8, §9. Do not re-run.**
+> Both plaintext and DTLS sessions pass, are captured, and are decoded. 168/202
+> AzCore TUs, 41/41 GridMate TUs. Reproducible from a wiped `build/` (test #20).
+> **Three claims in the prompt below turned out wrong and are marked SUPERSEDED
+> inline — read those before reusing any of this.** Prompt kept as historical
+> record and because the Path A/B reasoning is still the right shape for a rebuild.
 
 **Deliverable:** two GridMate `Carrier`s connecting locally in a process we
 control, captured both plaintext and DTLS-secured. This is the reference
@@ -240,32 +363,45 @@ instrument the whole project leans on (CHARTER §2).
 
 - **Dependency surface is clean.** GridMate includes only `<AzCore/...>` and the
   standard library — nothing from other frameworks. The carve-out is: compile
-  **AzCore** + **GridMate**, ignore the rest of the tree.
-- **C++ standard is C++14** (`-std=c++1y` in `compile_settings_clang.py`).
-- **No hard clang version gate** (`AZ_COMPILER_CLANG = __clang_major__`). Try the
-  system clang 22 first with `-std=c++14 -Wno-error`. Provision `/opt/llvm14`
-  ONLY on real compile errors from removed C++14-era features, not on warnings.
-  Do not disturb the system clang PZMapMaker uses.
+  **AzCore** + **GridMate**, ignore the rest of the tree. *(Confirmed by build —
+  every AzCore failure was a missing 3rdParty header, none on GridMate's surface.)*
+- ~~**C++ standard is C++14** (`-std=c++1y` in `compile_settings_clang.py`).~~
+  **SUPERSEDED — STATE §13.** The source needs **C++17**. `Math/Crc.inl:114` uses
+  an `auto` template parameter and `-std=c++14` is a hard error with no rescuing
+  flag. The Waf setting is what the 2019 clang was told, not what the code needs.
+- ~~**No hard clang version gate.** Try system clang 22 with `-std=c++14 -Wno-error`.
+  Provision `/opt/llvm14` ONLY on real compile errors from removed C++14-era
+  features.~~ **PARTLY SUPERSEDED.** The no-gate observation holds and
+  `/opt/llvm14` was correctly rejected — but the working invocation is
+  **`-std=c++17 -include utility -fdelayed-template-parsing -w`**, verified on
+  clang 18 and clang 22. Do not disturb the system clang PZMapMaker uses.
 - **Crypto is OpenSSL DTLS, confirmed in source.** `SecureSocketDriver.cpp`
   includes `<openssl/ssl.h>` etc. and uses `DTLS1_VERSION`, `DTLS1_RT_HEADER_LENGTH`
   (13), `DTLS1_HM_HEADER_LENGTH` (12), `SSL3_MT_CLIENT_HELLO`. Link `libssl` +
   `libcrypto`. The `RecordHeader` / `HandshakeHeader` structs in that file are the
   DTLS wire framing and become T5's reference layout — read them, do not reverse
-  them.
+  them. **Add `-DDTLS1_RT_HEARTBEAT=24`** — the constant was removed from OpenSSL 3
+  after Heartbleed and `SecureSocketDriver.cpp:416` still uses it (STATE §7, §13).
 - **Platform-header include paths** (the thing bypassing Waf usually breaks) are
   known. Waf prepends the `Platform/<OS>/` dir to the include search path. For
   Linux, add these `-I` dirs (fork at `/home/kaatlev/Documents/lumberyard`):
   - `dev/Code/Framework/AzCore/Platform/Linux`
   - `dev/Code/Framework/GridMate/Tests/Platform/Linux` (only if using the harness)
+  - **`Platform/Common/` must exist in the checkout** — a sparse checkout that
+    omits it fails with a confusing error pointing at the *Linux* header instead.
 - **Test certs exist:** `dev/Code/Framework/GridMate/Tests/Certificates.cpp` defines
   `g_untrustedCertPEM` / `g_untrustedPrivateKeyPEM`. Compile that file to resolve the
   `extern`s DTLS needs.
-- **The secure test path was likely never run on Linux.** No
-  `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` definition exists under the
-  Linux platform dir, so it defaults off. You must define it yourself
-  (`-DAZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER=1`) and should EXPECT to
-  shake out Linux-specific bugs on the DTLS path. The plaintext path is the safe
-  first milestone.
+- ~~**The secure test path was likely never run on Linux.** You must define
+  `-DAZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER=1` and should EXPECT to shake
+  out Linux-specific bugs on the DTLS path.~~ **SUPERSEDED — STATE §13, test #17.**
+  The trait does need defining, but **DTLS passed on the first run**, on both clang
+  majors, identical to plaintext. Zero Linux-path bugs. The trait gates the *test
+  harness*, not the driver, and the driver sits on `SocketDriverCommon` which the
+  plaintext path exercises constantly. *Untested is not broken* — do not budget
+  time against this.
+- **The fork tree is patched.** `RTTI/TypeInfo.h` reads `false_v<>`, committed.
+  A rebuild from bare `413ecaf` is **not** what was tested. STATE §13.
 
 ### Approach — two paths, attempt B first
 
@@ -283,30 +419,29 @@ tests. Satisfy the whole `Tests.h` chain plus both Linux `-I` dirs above.
 
 ### Steps
 
-1. **Toolchain probe.** Try to compile one AzCore `.cpp` (e.g. a Math or Memory
-   unit) with `clang++ -std=c++14 -Wno-error -I<AzCore root> -I<AzCore Linux platform>`.
-   Predict: it compiles with warnings. If it errors on removed C++ features, that is
-   the signal to provision `/opt/llvm14` — record which errors, they are data.
-2. **AzCore static lib.** Compile the AzCore subset GridMate names (STATE §7 lists
-   the include surface) into `libazcore.a`. Link pthreads. Expect `AzSocket` (UDP)
-   and `std/parallel/*` (threads) to be the load-bearing pieces.
+1. **Toolchain probe.** Compile one AzCore `.cpp` (a Math or Memory unit) with the
+   recipe above. *(Result: clean on clang 18 and 22. `/opt/llvm14` not needed.)*
+2. **AzCore static lib.** Compile the AzCore subset GridMate names into
+   `libazcore.a`. Link pthreads. *(Result: 168/202, `libazcore.a` 31M. Use
+   `triage.sh` to group failures by error kind rather than investigating each.)*
 3. **GridMate static lib.** Compile GridMate against the AzCore headers into
-   `libgridmate.a`.
+   `libgridmate.a`. *(Result: 41/41, `libgridmate.a` 4.9M.)*
 4. **Plaintext Carrier test (the milestone).** Path B `main()`, plain
-   `SocketDriver`, two Carriers on localhost, one connects to the other, exchange a
-   message. Capture on the wire with Wireshark. This is a clean cleartext reference
-   handshake — the thing T5 diffs the retail client against.
-5. **DTLS Carrier test.** Define the secure trait, swap in `SecureSocketDriver` with
-   `Certificates.cpp`, link OpenSSL. Confirm the handshake completes and the wire
-   traffic is now encrypted. Expect Linux-path bugs here (see above).
+   `SocketDriver`, two Carriers on localhost, exchange a message, capture the wire.
+   **Two runtime traps live here, neither a compile error, both segfault a binary
+   that links fine:** `OSAllocator` must be created before `SystemAllocator`, and
+   EBus handlers must be destroyed before `GridMateDestroy`. STATE §7.
+5. **DTLS Carrier test.** Define the secure trait, swap in `SecureSocketDriver`
+   with `Certificates.cpp`, link OpenSSL. **Then search the capture for the literal
+   payload string** — "PASS" only proves a session was established, not that
+   anything was encrypted. STATE §9.
 
 ### Definition of done
 
 A reproducible local GridMate session; a captured plaintext handshake; the
-`Carrier` packet header layout (connection id, sequence, ACK bitfield, channel,
-reliability flags) read out of `Carrier.cpp`/`Carrier.h` and confirmed against the
-plaintext capture; and the DTLS path either working or its Linux failure
-characterised exactly.
+`Carrier` packet header layout read out of `Carrier.cpp`/`Carrier.h` and confirmed
+against the plaintext capture; and the DTLS path either working or its Linux
+failure characterised exactly.
 
 ### Falsification
 
@@ -318,41 +453,53 @@ diverged — resolve that before T5 relies on this layout.
 ### Non-goals
 
 Not the retail client. Do not tune anything to match retail — this is the
-*known-good*, established on its own terms. No hooking yet (that's H1, which builds
-on this).
+*known-good*, established on its own terms. No hooking yet (that's H1).
 
 ### FINDINGS to record
 
-Fork commit under test; whether clang 22 sufficed or `/opt/llvm14` was needed (with
-the errors if so); the exact `-I` and `-l` flags that produced a working build (this
-is the reusable recipe); the Carrier header layout; and the state of the DTLS-on-Linux
-path. Fold all into STATE §5 (environment) and §7 (transport facts).
+Fork commit under test; whether clang 22 sufficed or `/opt/llvm14` was needed; the
+exact `-I` and `-l` flags that produced a working build; the Carrier header layout;
+and the state of the DTLS-on-Linux path. Fold into STATE §5 and §7.
 
 ---
 
 ## T5 — Reference vs retail handshake diff
 
-**This is the chunk that answers the charter's core question.** Depends on T1 and
-T4.
+**This is the chunk that answers the charter's core question.** Depends on T1
+(done), **T3** (the retail capture — not yet run), and T4 (done).
 
-**Scope.** Put the reference build's opening handshake bytes (T4) next to the
-retail client's opening bytes (T3 capture). Diff structurally: does the retail
-client's pre-encryption handshake line up with GridMate's `DefaultHandshake` +
-`Carrier` header — same fields in the same order, even if magic values or field
-widths differ?
+**Both inputs are specific artefacts, not vibes:**
+
+- **Reference:** the epoch-0 handshake from T4's `--secure` capture, documented in
+  STATE §9 — ClientHello (`fe fd`) / HelloVerifyRequest (`fe ff`) / ClientHello
+  with a 20-byte cookie echoed.
+- **Retail:** the epoch-0 pcap T3 saves as its own artefact.
+
+**Scope.** Diff structurally: does the retail client's pre-encryption handshake
+line up with GridMate's `DefaultHandshake` + `Carrier` header — same fields in the
+same order, even if magic values or field widths differ?
+
+**Filter the `'G'` wakeup byte first.** A 1-byte `0x47` datagram addressed to the
+socket's own port is `AZ_SOCKET_WAKEUP_MSG_VALUE`, not protocol, and roughly a
+third of reference loopback frames are these (STATE §8). Diffing without filtering
+them invents a phantom message type.
+
+**T3's cipher-suite result largely pre-answers this.** If T3 found a single-suite
+ClientHello offering `0xC030`, the structural match is close to established before
+the diff starts, and T5 becomes confirmation plus field-level documentation.
 
 **Definition of done.** One of:
 - **Structural match** → the client is GridMate or a close fork; the `Carrier`
   header layout is now the retail protocol's header layout, documented for free.
-- **No match, O3DE strings present (from T1)** → it's an `AzNetworking` rewrite;
-  re-scope the H and P tracks to that model.
+- **No match, O3DE strings present** → an `AzNetworking` rewrite. *Note: T1 already
+  ruled this out, so this outcome would mean T1 was wrong — investigate the
+  contradiction rather than accepting it.*
 - **No match, neither** → a bespoke protocol; the reference build degrades to "AZ
   reflection may still help" and P-track is fully empirical.
 
-**Falsification.** Predict which of the three you expect from T1's result before
-diffing. A GridMate fingerprint in T1 predicts a structural match here; if T1 said
-GridMate and the handshakes don't line up at all, one of the two is wrong — find
-out which before building on either.
+**Falsification.** T1 said GridMate, which predicts a structural match. **If the
+handshakes don't line up at all, one of T1 or T5 is wrong — find out which before
+building on either.** Do not quietly prefer the newer result.
 
 **Non-goals.** No decoding of message *bodies* yet — that's P-track. Handshake
 framing only.
@@ -363,13 +510,23 @@ framing only.
 
 ## H1 — Frida crypto hook on the reference build
 
-Depends on T2 (target function) and T4 (a build we control). **Prove the hook on
-the reference build before H3 points it at retail.**
+Depends on T2 (target function, done) and T4 (a build we control, done). **Prove
+the hook on the reference build before H3 points it at retail.**
 
-**Scope.** `Interceptor.attach` on `SSL_read`/`SSL_write` (or the T2 equivalent)
-in the reference `Carrier` process. Log the plaintext buffer, direction,
-timestamp, and connection id to a binary file. Confirm the logged plaintext
-matches the `SecureSocketDriver`-disabled capture from T4.
+**Scope.** `Interceptor.attach` on `SSL_read`/`SSL_write` in the reference
+`Carrier` process. Log the plaintext buffer, direction, timestamp, and connection
+id to a binary file. Confirm the logged plaintext matches the
+`SecureSocketDriver`-disabled capture from T4.
+
+**Two environment facts that shape this chunk:**
+
+- The reference build is a **native Linux binary** with full symbols — Frida
+  attaches trivially. Retail (H3) is a **PE process under Proton/Wine**, which is
+  a different and harder problem. Solve it in H3, not here, but know it is coming.
+- Retail's OpenSSL is **statically linked** (STATE §10), so H3 will need a
+  signature scan rather than a symbol lookup. Consider proving the
+  signature-scanning approach here too, where a known-good answer exists to check
+  it against.
 
 **Definition of done.** A Frida script that captures the full bidirectional
 plaintext stream from the reference build, verified against the known plaintext.
@@ -385,7 +542,9 @@ wrong function or after the wrong transform.
 
 ## H2 — Locate the dispatch point in retail (static)
 
-Depends on T1 and T5. **Static only** — no execution.
+Depends on T1 (done). T5 is needed only for the falsification check at the end —
+**this chunk can start now**, and is the fallback if T3 is blocked. **Static
+only** — no execution, no login, no running client.
 
 **Scope.** In Ghidra, work forward from `recvfrom`/`WSARecvFrom`: xref the call
 site (the `SocketDriver::Receive` equivalent), follow the output buffer through
@@ -393,15 +552,26 @@ decrypt → header parse → reliability/reassembly → **dispatch**. The dispat
 function is the target: either a large `switch` on a message-type id or an indexed
 jump through a function-pointer table. That table is the message-handler map.
 
+**Start with the RTTI analyzer.** RTTI survived in `NewWorld.exe` (STATE §10) —
+mangled-name fragments like `UEAAXPEAVReplicaChunkBase` are present. Ghidra's PE
+RTTI analyzer recovers the `ReplicaChunk` class tree, which is a far cheaper entry
+point than following xrefs blind.
+
+**Two modules to know about before following xrefs** (STATE §10): `vivoxsdk.dll`
+has its own network stack, and `libcds-amd64-vcv141.dll` is unidentified. Neither
+is the game transport.
+
 **Definition of done.** The dispatch function's address (as a signature, not a raw
 offset — charter §4), and, if it's a table, the table extracted as a list of
 (type-id → handler-address) pairs. Each entry is a message type that exists.
 
-**Falsification.** If GridMate (from T5), the path should pass through
-`Carrier::Receive` and a `ReplicaManager` receive entry. If the xref chain doesn't
-resemble that, revisit whether T5's verdict was right.
+**Falsification.** If GridMate (T1 says so, T5 will confirm), the path should pass
+through `Carrier::Receive` and a `ReplicaManager` receive entry. If the xref chain
+doesn't resemble that, revisit whether T1's verdict was right — do not just accept
+the mismatch.
 
 **Non-goals.** No hooking. No decoding handler bodies — P2 does that with captures.
+Nothing touching EAC, which lives in `<install>/EasyAntiCheat/` (charter §3).
 
 ---
 
@@ -410,18 +580,26 @@ resemble that, revisit whether T5's verdict was right.
 **Blocked on H1 and H2.** Do not start until both land.
 
 When unblocked: adapt the H1 Frida script to the retail client, attaching at the
-T2 crypto boundary and/or the H2 dispatch function. Signature-scan for the target;
-never hardcode the address. Mirror captures to a loopback UDP socket so they can be
-piped into Wireshark with a growing Lua dissector. Expect the retail client to
-carry runtime protections the reference build does not — note what fights the hook,
-but per charter §3 do not engage anything that is an integrity/attestation system.
+T2 crypto boundary and/or the H2 dispatch function. **Signature-scan for the
+target; never hardcode the address** — retail's OpenSSL is statically linked, so
+there is no symbol to look up (STATE §10). Mirror captures to a loopback UDP socket
+so they can be piped into Wireshark with a growing Lua dissector.
+
+**The Proton problem is this chunk's first real obstacle.** The retail client runs
+as a PE process under Wine (STATE §5). Attaching Frida to that is materially
+different from attaching to the native reference build, and it should be treated
+as the opening question of the chunk rather than a detail.
+
+Expect the retail client to carry runtime protections the reference build does not
+— note what fights the hook, but per charter §3 do not engage anything that is an
+integrity/attestation system.
 
 ---
 
 ## H4 — The reflection reader (`SerializeContext`) — DECISION GATE
 
-Depends on T1. **Deliverable is a written decision, then a prototype only if the
-decision is go.**
+Depends on T1 (done). **Deliverable is a written decision, then a prototype only
+if the decision is go.**
 
 **Why this could collapse P-track.** The client holds a global
 `ComponentApplication` with a `SerializeContext` (class names, field names, member
@@ -432,8 +610,14 @@ named, typed objects instead of guessing byte offsets.
 
 **The gate.** The blocker is header/ABI drift between our fork and the shipped
 build — struct layouts must match closely enough to traverse. Decide, with
-evidence from T1's build-identity findings, whether the ABI is close enough to
-attempt this. If not, say so and P-track stays fully empirical.
+evidence, whether the ABI is close enough to attempt this. If not, say so and
+P-track stays fully empirical.
+
+**Evidence now available that this prompt predates:** T1 confirmed the retail
+client carries `GridMateAllocatorMP` / `GridMateAllocator` and ~94
+`InitializeReplicatedFields` references, and that RTTI survived (STATE §10). The
+fork builds and runs (STATE §7). Both sides of the ABI comparison are therefore
+inspectable — this decision can be made on evidence rather than guesswork.
 
 **Definition of done.** A decision with the ABI evidence attached. If go, a
 prototype that locates the global `ComponentApplication` on the reference build and
@@ -455,21 +639,35 @@ Write the full prompt when the chunk comes up, using the shape above.
 - **P1 Handshake sequence.** Byte-document the connect exchange from H3 captures,
   cross-referenced against T5's header layout.
 - **P2 Message-type census.** Turn H3's dispatch-table hits into a list of known
-  message types with frequencies. If T1 found protobuf descriptors, this is where
-  they get extracted.
+  message types with frequencies. **T1 found `google::protobuf::Reflection::` in
+  `NewWorld.exe` itself** (not in EAC or Vivox — both scanned, both zero), so
+  embedded `FileDescriptorProto` blobs may hand over the schema rather than
+  requiring reverse engineering. This is where they get extracted. STATE §10.
 - **P3 Position/movement message.** The controlled-walk experiment (walk a straight
   line at constant speed; the smoothly-varying float triple or quantized int is the
   position). GridMate's transform marshalers quantize — see `CompressionMarshal.h`
-  / `MathMarshal.h` in the fork for the exact scheme.
+  / `MathMarshal.h` in the fork for the exact scheme. **T3 collects a stand-still
+  and a walking window**, so the timing/size delta is a free head start.
 - **P4 Initial world-state sync.** The login state dump is the biggest, most
   informative single message — capture it with a log-out/log-in cycle.
 - **P5 Replica/chunk model.** Map `ReplicaChunk` types (identified on the wire by
-  `AZ::Crc32` of the chunk name) to the descriptor table dumped via H4.
+  `AZ::Crc32` of the chunk name) to the descriptor table dumped via H4. **Noticed
+  during D2:** `object-stream-converter` and `asset-catalog-parser` in the
+  new-world-tools kit would likely say a lot about the replicated-object model.
+  Recorded, not acted on. STATE §11.
 - **S1–S3.** Server work, all blocked on the corresponding P-track chunks. Prompts
-  when P1/P3/P4 resolve.
-- **D1 Signature-scan harness.** So offsets survive a client patch. Worth building
-  the moment H3 has more than one hardcoded offset.
-- **D2 Client game-data extraction.** **DONE 2026-08-29** -- prompt in `D2_PROMPT.md`, findings in STATE §11. Paks are standard ZIP; compression method 15 is Oodle. **2250 datasheets**, all in `SharedDataStrm-part{1..11}.pak` + base -- *not* `GameData.pak`, and there is no `assets/server/server.pak` in build 22469132 despite the tool README. Extracted and converted to JSON with localization applied via new-world-tools @ `e51c79a9`, built natively on Linux. Track S has its content source.
+  when P1/P3/P4 resolve. Content source is ready (D2).
+- **D1 Signature-scan harness.** So offsets survive a client patch. **Head start:**
+  `pins/22469132/Bin64.sha256` plus `sha256sum -c` already gives a per-file list of
+  which binaries a patch touched (STATE §5). Worth finishing the moment H3 has more
+  than one hardcoded offset.
+- **D2 Client game-data extraction.** **DONE 2026-08-29** — prompt in
+  `D2_PROMPT.md`, findings in STATE §11. Paks are standard ZIP; compression method
+  15 is Oodle. **2250 datasheets**, all in `SharedDataStrm-part{1..11}.pak` + base
+  — *not* `GameData.pak`, and there is no `assets/server/server.pak` in build
+  22469132 despite the tool README. Extracted and converted to JSON with
+  localization applied via new-world-tools @ `e51c79a9`, built natively on Linux.
+  Track S has its content source.
 
 ---
 
@@ -513,3 +711,8 @@ as an input, and fold it into `STATE.md` before starting anything else.
 The **Corrections** and **Unverified** sections earn their keep. A session that
 records what it merely *believes*, separately from what it *checked*, is handing
 the next session the list of things worth checking.
+
+**Also update this file when a chunk lands:** tick the index row, add a DONE banner
+to the prompt, and mark any claim inside the prompt that the chunk falsified. A
+stale prompt is how a future session rebuilds something that already exists — the
+T1/T2/T4 rows sat at `[ ]` for a full session after they were complete.
