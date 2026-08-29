@@ -1,0 +1,28 @@
+==========================================================
+ T1 ENGINE FINGERPRINT — 2026-08-28 23:13
+ game: /home/kaatlev/.steam/steam/steamapps/common/New World
+==========================================================
+
+Bin64/NewWorld.exe                                   GM=43    O3DE=1     AZ=706   3rd=1     net=6
+Bin64/GameCrashUploader.exe                          GM=0     O3DE=0     AZ=4     3rd=0     net=1
+Bin64/dstoragecore.dll                               GM=1     O3DE=0     AZ=0     3rd=0     net=0
+
+=== totals ===
+  GridMate family   : 44
+  O3DE AzNetworking : 1
+  AZ baseline       : 710
+  third-party net   : 1
+  socket API names  : 20
+
+=== RTTI mangled names (decisive if present) ===
+  none found — RTTI may be stripped, or names are not MSVC-mangled.
+  Not evidence of absence. Confirm in Ghidra with the PE RTTI analyzer.
+
+=== verdict ===
+  BOTH present. Check whether the O3DE hits are real or substring noise
+  (e.g. 'ConnectionData' is a generic name). Look at the actual strings.
+
+  *** third-party netcode/serialization strings present. If protobuf,
+      CHUNKS says flag it loudly: embedded FileDescriptorProto blobs may
+      hand over the message schema and make P2 far cheaper. Do NOT
+      extract them in T1 -- just record the flag.

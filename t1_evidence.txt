@@ -1,0 +1,91 @@
+==========================================================
+ T1 EVIDENCE — NewWorld.exe
+ /home/kaatlev/.steam/steam/steamapps/common/New World/Bin64/NewWorld.exe
+ 2026-08-28 23:15
+==========================================================
+extracting strings (171M binary, this takes a moment)...
+  364550 strings extracted
+
+--- GridMate family (decisive for T1) ---
+       16 GridMate
+        6 VTriggerAreaReplicaChunkDesc
+        6 VTriggerAreaReplicaChunk
+        6 VTransformReplicaChunk
+        3 TransportLayerGridMate
+        2 UEAAXPEAVReplicaChunkBase
+        1 UEAAPEAVReplicaChunkBase
+        1 TransportLayerGridMateTickThread
+        1 TransformReplicaChunk
+        1 ScriptComponentReplicaChunk
+        1 GridSession
+        1 GridMateThreadPump
+        1 GridMateReplicaStatus
+        1 GridMateReplicaSessionInfo
+        1 GridMatePeerReplica
+        1 GridMateLANSessionReplica
+        1 GridMateLANMemberState
+        1 GridMateLANMember
+        1 GridMateForTools
+        1 GridMateAllocatorMP
+        1 GridMateAllocator
+
+--- O3DE AzNetworking family (would falsify GridMate) ---
+        1 TransformLinkConnectionData
+
+--- third-party netcode / serialization ---
+        1 google::protobuf::Reflection::
+
+--- socket API (transport shape) ---
+        5 WSASend
+        3 WSARecvFrom
+        2 WSARecv
+        2 closesocket
+        1 WS2_32.dll
+
+--- crypto library (feeds T2) ---
+       12 dtls1_
+        5 SSL_write
+        4 SSL_read
+        3 DTLSv1
+        1 OpenSSL 1.1.1k
+
+--- AZ baseline (survives a rewrite — NOT proof on its own) ---
+      559 SerializeContext
+      166 EBus
+      152 AzFramework
+       13 AzCore
+        7 ComponentApplication
+        4 BehaviorContext
+
+--- Carrier / Replica context (is the GridMate shape really there?) ---
+       94 InitializeReplicatedFields
+       13 Handshake
+        8 VGetBucketReplicationResult
+        8 Carrier
+        7 ReplicatedContainer
+        6 VTriggerAreaReplicaChunkDesc
+        6 VTriggerAreaReplicaChunk
+        6 VTransformReplicaChunk
+        6 Replicate
+        6 HandleReplicatedState
+        5 Replication
+        4 ReplicateClient
+        3 VPaperdollComponentReplicatedState
+        3 ReplicationDataManager
+        3 ReplicationControl
+        3 Handshaker
+        3 HandleReplicatedGuildState
+        3 AEAAXAEBVGuildsComponentReplicatedState
+        2 VitalsReplicatedData
+        2 UpdateReplicatedPaperdollSlots
+        2 UEAAXPEAVReplicaChunkBase
+        2 ReplicatedStateBundle
+        2 Replicated
+        2 GUReplicatedStatusEffectData
+        2 DataSet
+        1 WarDataBeenReplicated
+        1 WarboardDataBeenReplicated
+        1 VWaypointsComponentReplicatedState
+        1 VWaterLevelComponentReplicatedState
+        1 VWarDataComponentReplicatedState
+

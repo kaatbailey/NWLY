@@ -137,7 +137,7 @@ Proton — record which once T3/H1 establish the working setup.
 | What                        | Path / value                          |
 | --------------------------- | ------------------------------------- |
 | Client build under test     | `<record exact version + kept installer>` |
-| Retail client binary        | `<path>`                              |
+| Retail client binary        | `~/.steam/steam/steamapps/common/New World/Bin64/NewWorld.exe` (171 MB, unpacked). Steam build, OpenSSL 1.1.1k statically linked. |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, stock fork of aws/lumberyard, `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
 | Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
 | Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` (the tree all §7 facts were read from) |
@@ -145,7 +145,7 @@ Proton — record which once T3/H1 establish the working setup.
 | Toolchains                  | System **clang 22** (used by PZMapMaker — do not disturb). If an old clang is needed for the fork, drop LLVM 14 into `/opt/llvm14` (isolated, no PATH change) and point CMake at it; keep the two projects separate via CLion toolchains. |
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Probe result below. |
 | AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 22 (T4 step 1). See §7 for why each flag is there. |
-| Ghidra project              | `<path>`                              |
+| Ghidra project              | not yet created. RTTI survived (§10), so run the PE RTTI analyzer first — it recovers the ReplicaChunk class tree cheaply. |
 | Capture output              | `<path>`                              |
 | NWLY repo (local)           | `~/Documents/NWLY` |
 
@@ -541,6 +541,86 @@ retail.
 
 ---
 
+## 10. FINDINGS — T1 (engine fingerprint) + T2 (crypto), static
+
+**Client build under test:** `NewWorld.exe`, 171 MB, Steam install, unpacked.
+OpenSSL version string `OpenSSL 1.1.1k  25 Mar 2021`. (Exact game build number
+not yet recorded — worth pulling from the launcher before T5.)
+
+**Status:** T1 complete. T2 all but the anti-cheat non-goal — crypto library,
+boundary function and linkage are all answered below.
+
+**Method:** `strings -a -n 6` over every binary >1 MB, families counted then
+dumped verbatim (`t1_fingerprint.sh`, `t1_evidence.sh`). No Ghidra needed to
+reach the verdict; no dynamic analysis; the game was never launched.
+
+**Confirmed — engine is GridMate, not O3DE:**
+- Decisive: `TransportLayerGridMate` and `TransportLayerGridMateTickThread` —
+  New World's own class wrapping GridMate transport, so GridMate is the live
+  network layer, not a leftover string.
+- Replica stack present: `GridMateLANSessionReplica`, `GridMatePeerReplica`,
+  `GridMateReplicaStatus`, `GridMateReplicaSessionInfo`, `GridMatePeerReplica`,
+  plus `GridMateAllocatorMP` / `GridMateAllocator` (the same allocators the T4
+  probe had to bootstrap by hand).
+- Gameplay replica chunks ride it: `VTransformReplicaChunk`,
+  `VTriggerAreaReplicaChunk`, `ScriptComponentReplicaChunk`, and ~94
+  `InitializeReplicatedFields` references — the `ReplicaManager` shape the T4
+  reference assumed. **T5's diff strategy holds.**
+- 43 GridMate-family hits total in `NewWorld.exe`.
+
+**Confirmed — O3DE AzNetworking absent:** the only O3DE-family hit was
+`TransformLinkConnectionData`, a gameplay struct ending in `ConnectionData` —
+the exact generic-name trap CHUNKS T1 warned about. Zero real `AzNetworking`
+symbols. The falsification condition (no GridMate strings AND O3DE set present)
+is not met.
+
+**Confirmed — transport is UDP datagram, GridMate shape:** `WSASend`,
+`WSARecvFrom`, `WSARecv`, `closesocket`, `WS2_32.dll`. Datagram calls present,
+consistent with `SocketDriver`. (String-level evidence; Ghidra should confirm
+these are real imports, not incidental ASCII.)
+
+**Confirmed — crypto (this is most of T2):**
+- Library: **OpenSSL 1.1.1k (25 Mar 2021)**. Same DTLS-over-OpenSSL design as
+  the T4 reference build.
+- Plaintext boundary: **`SSL_read` / `SSL_write`** (`dtls1_`, `DTLSv1` also
+  present — DTLS confirmed).
+- Linkage: **static.** No `*ssl*` / `*crypto*` / `*eay*` DLL anywhere in
+  `Bin64/` (checked with `find`). Consequence for the H-track: **no DLL
+  proxying is possible** — a hook above the plaintext boundary must be an inline
+  hook located by signature, patched in memory. This is the harder of T2's two
+  outcomes and it sets H1's method.
+
+**Confirmed — RTTI survived (corrects an in-session claim):** MSVC mangled-name
+fragments are present, e.g. `UEAAXPEAVReplicaChunkBase` (`PEAV` = pointer-to-
+class) and `AEAAXAEBVGuildsComponentReplicatedState` (`AEBV` = const-ref-to-
+class). The binary is not stripped. Ghidra's PE RTTI analyzer will recover the
+class hierarchy — cheaper D2.
+
+**Unverified (believed, not yet tested):**
+- That the `WSA*` strings are real imports rather than incidental ASCII. Test:
+  Ghidra import table, or `dumpbin`/`objdump -p`-equivalent on the PE.
+- That retail's DTLS handshake matches the reference cookie exchange (§9). Test:
+  T3/T5 — capture a retail session and diff the epoch-0 handshake.
+
+**Flagged, out of scope (CHUNKS T1 says flag loudly):** `google::protobuf::
+Reflection::` appears **in `NewWorld.exe` itself** — not in the EAC or Vivox
+DLLs (both scanned, both 0). Game code uses protobuf. Embedded
+`FileDescriptorProto` blobs may carry the message schema and make **P2 far
+cheaper** — potentially schema handed over rather than reverse-engineered. NOT
+extracted here per T1 non-goals; recorded as a flag only.
+
+**Noticed, out of scope:** EAC present (`EOSSDK-Win64/Win32-Shipping.dll`).
+Charter §3 — not touched, not analysed.
+
+**Commands worth keeping:**
+- `./t1_fingerprint.sh --out t1_scan.txt` — family counts + verdict.
+- `./t1_evidence.sh --out t1_evidence.txt` — the verbatim matched strings.
+- `find <Bin64> -iname '*ssl*' -o -iname '*crypto*' -o -iname '*eay*'` — the
+  static-vs-dynamic linkage check (empty = static). Use `find`, not a shell
+  glob; fish aborts a failed glob before the `or`.
+
+---
+
 ## 8+. Reserved for later confirmed findings
 
 Sections from 8 onward are added as work produces confirmed results — retail
@@ -558,6 +638,7 @@ that overturns a prior claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| "RTTI is stripped from `NewWorld.exe` — no mangled names found." Said in session after the first scan's RTTI regex returned nothing. | **WRONG.** The regex only matched fully-formed `.?AV...@ns@@` symbols; the binary carries mangled-name *fragments* (`UEAAXPEAVReplicaChunkBase`, `AEBV...ReplicatedState`) that a stricter pattern missed. RTTI survived. Cause: judged absence from one narrow regex rather than a broad mangled-fragment search. Ghidra's RTTI analyzer will confirm and recover the class tree. |
 | "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
 | "OpenSSL 3.x is a non-issue for `SecureSocketDriver.cpp`; modern OpenSSL needs no shim." — stated after the probe compiled clean, and written into §7. | **TOO STRONG.** `SecureSocketDriver.cpp:416` uses `DTLS1_RT_HEARTBEAT`, removed from OpenSSL after Heartbleed. It compiles only with `-DDTLS1_RT_HEARTBEAT=24`. Cause of the error: `t4_openssl_probe.cpp` enumerates *function calls*, so a removed *macro constant* was invisible to it. The probe's conclusion was right about the API era and wrong about completeness. Lesson: a probe proves what it tests, not what it was designed to reassure about. |
 | "Step 2 is understated — expect an explicit `AllocatorInstance` bootstrap in `main()` just to get AzCore compiling." Raised in session. | **WRONG about the phase, right about the trap.** Compiling AzCore needs no bootstrap at all: 168/202 TUs build with the plain step-1 recipe and every failure is a missing 3rdParty header. The bootstrap is a *runtime* requirement and it surfaced exactly at step 4, as a segfault in a binary that linked cleanly. See §7. |
@@ -596,4 +677,5 @@ at project start.
 | 20 | Rebuild archives from scratch after `build/` was deleted, re-run plaintext capture. | Byte-identical traffic. | **Confirmed.** Datagram 2 reproduced exactly (`00 02 a0 00 05 03 ...`). The build is reproducible from the pinned commit; `build/` is safe to delete. |
 | 21 | Decode a `--secure` capture taken from before the session opens. | ApplicationData only, as in the earlier mid-session capture. | **Richer than expected.** Caught the full cookie exchange at epoch 0: ClientHello (DTLS1.2) / HelloVerifyRequest (DTLS**1.0**) / ClientHello with the 20-byte cookie echoed. Confirms §7's pre-T4 reading of the `HandshakeHeader`. See §9. |
 | 22 | Search the `--secure` capture for the literal payload string, on the target machine. | Absent. | **Confirmed, 0 matches.** Note `grep -c` exits 1 on a zero count, so the shell reports an error on success — the count is the result, not the exit code. |
+| 23 | T1: `strings` fingerprint of `NewWorld.exe` for engine family. Predicted GridMate (2016 LY origin). | GridMate present, O3DE absent. | **Confirmed.** 43 GridMate hits incl. `TransportLayerGridMate`; the sole O3DE hit was the gameplay struct `TransformLinkConnectionData`. Crypto fell out: OpenSSL 1.1.1k, static, `SSL_read`/`SSL_write`. Protobuf in the game binary. §10. |
 
