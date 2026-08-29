@@ -90,11 +90,11 @@ diff) → H1, H2 → H3 → P-track → S-track. D1 can start any time.
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
 that had a clock on it.
 
-**One open discrepancy, carried from 2026-08-29:** the Lumberyard fork tree is
-**patched** (`RTTI/TypeInfo.h`, `false_v<T>` → `false_v<>`, committed), which
-contradicts §7's and test #6's claim of "no edits to Amazon's tree." The pin at
-`413ecaf` therefore does not describe the tree that built. See §13 and the
-UNVERIFIED note in §5.
+**Fork pin corrected 2026-08-29:** the Lumberyard fork tree is **patched** —
+`RTTI/TypeInfo.h`, `false_v<T>` → `false_v<>`, committed as **`7d4f1ee6`**, the
+single commit on top of `413ecaf`. This contradicts §7's and test #6's original
+claim of "no edits to Amazon's tree." **The build point is `7d4f1ee6`, not
+`413ecaf`.** See §5 and §13.
 
 ---
 
@@ -187,12 +187,13 @@ dynamic work runs against the client **under Proton** (confirmed below).
 | Capture output              | Retail: `~/Documents/nwly-captures/` (outside the repo). Reference: `build/*.pcap` (gitignored except `!build/*.pcap`). |
 | EasyAntiCheat location      | `<install>/EasyAntiCheat/` — `EasyAntiCheat_EOS_Setup.exe`, `EOSSDK-Win32-Shipping.dll`, `EOSSDK-Win64-Shipping.dll`. **A sibling of `Bin64/`, not inside it.** §10's mention could be read as implying `Bin64/`; a scan of `Bin64/` alone would wrongly conclude EAC is absent. Location recorded only. CHARTER §3 — not touched, not analysed. |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, fork of aws/lumberyard, branch `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
-| Lumberyard fork commit      | `413ecaf24d7a534801cac64f50272fe3191d278f` — the tree all §7 facts were **read** from. **NOT the tree that built.** See the next row and §13. |
-| **Fork patch (UNVERIFIED hash)** | `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` is clean, so the patch is **committed**. The build recipe is `413ecaf` **plus this patch**. **Open action:** run `git log --oneline 413ecaf24d7a534801cac64f50272fe3191d278f..HEAD` and record the real commit hash here. |
+| Fork commit — **read** from   | `413ecaf24d7a534801cac64f50272fe3191d278f`. Every §7 source-reading fact was established against this tree. **This is not the tree that builds.** |
+| Fork commit — **built** from  | **`7d4f1ee6`** — *"AzCore: fix false_v<T> static_assert for modern clang (template-template param can't be a template arg)"*. The **only** commit on top of `413ecaf` (test #31), and it is pushed (`HEAD -> master, origin/master, origin/HEAD`). **Pin every build result to `7d4f1ee6`.** For a full 40-char hash: `git rev-parse HEAD`. |
+| What the patch changes       | `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`: `static_assert(false_v<T>, ...)` → `static_assert(false_v<>, ...)` at lines 161/169/177/185/193. Amazon's original is `false_v<T>`, which modern clang rejects as a template-template parameter used without arguments. See §13 — §7 and test #6 originally claimed no source edits were made. |
 | NWLY repo                   | `github.com/kaatbailey/NWLY`, branch `Master` (capital M). Local: `~/Documents/NWLY`. |
 | Toolchains                  | System **clang 22** (also used by PZMapMaker — do not disturb). `/opt/llvm14` was considered and **rejected** — see §7. |
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Reference build only; retail ships its own static 1.1.1k. |
-| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. |
+| AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. **`-fdelayed-template-parsing` is now probably redundant** — the `7d4f1ee6` patch fixes the same five diagnostics at source, and `Vector3.cpp` compiles clean without it (test #32). Kept in the recipe until a full-build check confirms; see §7. |
 | GridMate build recipe       | The AzCore recipe plus `-I GridMate -I GridMate/Platform/Linux` and **`-DDTLS1_RT_HEARTBEAT=24`**. See §7. |
 | Ghidra project              | Not yet created. RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
 
@@ -411,8 +412,29 @@ both covered). Test-log #5–#9.
 | ---- | ---------- | ----- |
 | `-std=c++17` | `Math/Crc.inl:114: 'auto' not allowed in template parameter until C++17` | The source is *not* C++14. See correction §13. |
 | `-include utility` | `std/utils.h:45: no member named 'exchange' in namespace 'std'` | `using std::exchange;` relied on a transitive `<utility>` that modern libstdc++ no longer pulls in. |
-| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. **NOTE: the fork has since been patched to `false_v<>`, which fixes the same error at source. Whether this flag is still required is UNVERIFIED — see §13.** |
+| `-fdelayed-template-parsing` | `RTTI/TypeInfo.h:161,169,177,185,193: use of template template parameter 'T' requires template arguments` (×5) | `static_assert(false_v<T>, ...)` inside an uninstantiated template; modern clang diagnoses eagerly where the 2019 clang did not. **Superseded in practice by commit `7d4f1ee6`**, which patches the source to `false_v<>` and fixes the same five diagnostics — see the note below. |
 | `-w` | ~31 warnings under C++14 | Cosmetic only, and 0 under C++17 anyway. Drop it if you want to read them. |
+
+**Two independent fixes now exist for the same five `TypeInfo.h` diagnostics:**
+the `-fdelayed-template-parsing` flag, and the `7d4f1ee6` source patch. Only one
+is needed. `AzCore/Math/Vector3.cpp` — the TU that originally surfaced the error —
+compiles **exit 0 without the flag** (test #32), so the patch alone is sufficient
+there.
+
+**UNVERIFIED across the full build.** One TU is not 209. The flag stays in the
+recipe until this comes back clean:
+
+```fish
+cd ~/Documents/lumberyard/dev/Code/Framework
+# edit triage.sh to drop -fdelayed-template-parsing, then:
+bash triage.sh azcore   # expect 168/202, same as test #10
+bash triage.sh gridmate # expect 41/41, same as test #11
+```
+
+Matching counts mean the flag can come out of the recipe permanently. Any new
+failure means the flag is load-bearing somewhere `Vector3.cpp` doesn't reach, and
+it stays — which is also worth knowing, because it would mean the patch and the
+flag cover different sites.
 
 **Decision: do NOT provision `/opt/llvm14`.** An earlier plan was to fall back to
 LLVM 14 on real compile errors. Real errors did occur — but none were removed
@@ -880,7 +902,7 @@ claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
-| "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. The reproducible recipe is that commit **plus** this patch, and test #20's reproducibility result holds for the *patched* tree only. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Two open actions:** (1) record the patch commit hash via `git log --oneline 413ecaf..HEAD`; (2) determine whether `-fdelayed-template-parsing` is still required now that the source is patched — the flag and the patch fix the same five diagnostics. |
+| "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Both follow-up actions are now closed (tests #31, #32):** the patch is commit **`7d4f1ee6`**, the only one on top of `413ecaf`, and it is pushed. §5 now carries a read-from / built-from pair. Test #20's reproducibility result holds for `7d4f1ee6`. `-fdelayed-template-parsing` is redundant on the TU that surfaced the error, but is kept pending a full-build check — see §7. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. |
 | "RTTI is stripped from `NewWorld.exe` — no mangled names found." Said in session after the first scan's RTTI regex returned nothing. | **WRONG.** The regex only matched fully-formed `.?AV...@ns@@` symbols; the binary carries mangled-name *fragments* (`UEAAXPEAVReplicaChunkBase`, `AEBV...ReplicatedState`) that a stricter pattern missed. RTTI survived. Cause: judged absence from one narrow regex rather than a broad mangled-fragment search. Ghidra's RTTI analyzer will confirm and recover the class tree. |
 | "Expect Linux-path bugs at T4 step 5" — §7 and T4_PROMPT, reasoned from `AZ_TRAIT_GRIDMATE_TEST_WITH_SECURE_SOCKET_DRIVER` being undefined on Linux, i.e. Amazon compiled the secure tests out on this platform and so presumably never ran them. | **DID NOT MATERIALISE.** DTLS passed on the first run, on both clang 18 and clang 22, in the same 201 updates as plaintext. Zero Linux-path bugs. The inference was reasonable and the conclusion was still wrong: *untested* is not *broken*. The trait gates the **test harness**, not the driver, and the driver sits on `SocketDriverCommon`, which the plaintext path exercises constantly. Worth remembering before budgeting time against a similar warning. |
@@ -932,4 +954,6 @@ result — so no test is silently retried and no result is remembered wrong.
 | 27 | D2: build new-world-tools `@e51c79a9` natively on Garuda and extract method-15 (Oodle) entries. | Fails — MSVC/PE-DLL dependency forces Proton. | **Falsified.** `go build` clean; runtime `dlopen` of a native Oodle v2.9.13 (+ `libtexconv.so`), both auto-downloaded on first run. Extraction succeeded. Note: the tool fetches binaries from the network — relevant to any air-gapped re-run. |
 | 28 | D2: bulk-extract every `.datasheet` and compare against the independent census. | 2250, matching the central-directory count. | **Confirmed.** `pak-extracter` produced exactly 2250 → 2250 JSON. Two independent code paths agree, so neither is silently dropping entries. 198 of 2250 stored (method 0), 2052 Oodle. |
 | 29 | Enumerate every module in `Bin64/` and check against §10's static-linkage claim, which rested on a `find` returning empty. | No `*ssl*`/`*crypto*` module; inventory otherwise unremarkable. | **Confirmed, and richer than predicted.** 22 files, no crypto module — linkage claim now positive rather than absence-based. Three unanticipated findings: `vivoxsdk.dll` (second network stack, contaminates T3), no `steamnetworkingsockets` (weak evidence against SDR), `libcds-amd64-vcv141.dll` unidentified. |
-| 30 | Check whether the Lumberyard fork tree is modified, after a recovered `CMakeLists.txt` comment referenced a "TypeInfo.h patch" that §7 and test #6 said did not exist. `git status --short` + `rg -n 'false_v' .../RTTI/TypeInfo.h`. | Tree clean and unmodified; the CMake comment is stale. | **Falsified — the tree is patched.** `false_v<>` at lines 161/169/177/185/193 (Amazon's original is `false_v<T>`), with a **clean** `git status`, so the patch is committed. §5's pin `413ecaf` does not describe the tree that built. See §13. Open: record the patch commit hash; determine whether `-fdelayed-template-parsing` is still needed. |
+| 30 | Check whether the Lumberyard fork tree is modified, after a recovered `CMakeLists.txt` comment referenced a "TypeInfo.h patch" that §7 and test #6 said did not exist. `git status --short` + `rg -n 'false_v' .../RTTI/TypeInfo.h`. | Tree clean and unmodified; the CMake comment is stale. | **Falsified — the tree is patched.** `false_v<>` at lines 161/169/177/185/193 (Amazon's original is `false_v<T>`), with a **clean** `git status`, so the patch is committed. §5's pin `413ecaf` does not describe the tree that built. See §13. |
+| 31 | `git log --oneline 413ecaf..HEAD` in the fork — how much has accumulated on top of the pinned commit? | One commit, the `TypeInfo.h` patch. Possibly more, since nobody had looked. | **Confirmed, prediction held exactly.** Exactly one commit: **`7d4f1ee6`** *"AzCore: fix false_v<T> static_assert for modern clang (template-template param can't be a template arg)"*. `HEAD -> master, origin/master, origin/HEAD` — pushed, not local-only. §5 now records read-from (`413ecaf`) and built-from (`7d4f1ee6`) separately. Closes the §13 open action. |
+| 32 | Drop `-fdelayed-template-parsing` and compile `AzCore/Math/Vector3.cpp` — the TU that originally produced the five `TypeInfo.h` diagnostics (test #6). Is the flag still needed now the source is patched? | Exit 0 — the `7d4f1ee6` patch fixes the same diagnostics at source, making the flag redundant. | **Confirmed for this TU.** exit 0, no diagnostics. **Scope caveat: one TU is not 209.** The flag stays in the recipe until `triage.sh` runs clean without it across both libraries (expect 168/202 and 41/41, matching tests #10 and #11). Command in §7. |
