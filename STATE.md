@@ -172,6 +172,12 @@ Compile it to answer "does the local OpenSSL match the API era this source
 assumes" in one step. Build line is in its header comment. Re-run it after any
 OpenSSL major upgrade; that is the whole point of keeping it.
 
+**Know its blind spot before trusting a clean run.** It enumerates *function
+calls*, so a removed *macro constant* is structurally invisible to it — which is
+exactly how `DTLS1_RT_HEARTBEAT` got past it and surfaced only when GridMate
+itself was compiled (§7, §13). A clean probe run means "the API era matches",
+not "OpenSSL is fine". The real test is compiling `SecureSocketDriver.cpp`.
+
 **`build_gridmate.sh`** — builds `libazcore.a` and `libgridmate.a` from the fork
 using the step-1 recipe. Writes nothing inside the Lumberyard tree; all output
 goes to `./build`. Incremental, parallel, and tolerant of the expected 3rdParty
@@ -499,6 +505,40 @@ known cleartext is what proves it. Keep that check in any future secure test.
 `decode_carrier.py` recognises both formats, so one tool identifies which mode a
 capture came from.
 
+### The cookie exchange, confirmed on the wire
+
+A capture started before the session opens catches the full DTLS handshake, and
+it confirms the `HandshakeHeader` / cookie machinery §7 recorded from
+`SecureSocketDriver.cpp` pre-T4:
+
+```
+client -> server   ClientHello          DTLS1.2  epoch=0   (no cookie)
+server -> client   HelloVerifyRequest   DTLS1.0  epoch=0   (issues cookie)
+client -> server   ClientHello          DTLS1.2  epoch=0   (cookie echoed)
+```
+
+**The HelloVerifyRequest is DTLS 1.0 (`fe ff`) while both ClientHellos are 1.2
+(`fe fd`), and that is correct.** RFC 6347 §4.2.1: the server is stateless at
+that point and has not negotiated a version, so HVR goes out at 1.0. **This is
+not a bug and not a downgrade.** Expect to see it in retail captures too; do not
+spend time chasing it.
+
+The cookie is plainly visible and echoed verbatim. Observed:
+
+```
+14 a2 f9 d4 cb ae ce 22 76 38 4e bd 18 12 b8 f0 89 10 80 02 70
+^^ length byte (0x14 = 20), then 20 cookie bytes
+```
+
+It appears in the HelloVerifyRequest and again in the second ClientHello. Cookie
+values are per-connection — the bytes above are one observed sample, not a
+constant.
+
+Everything from `ChangeCipherSpec` onward is epoch >= 1 and therefore ciphertext.
+The handshake above is the only part of a secure session that is readable
+without session keys, which makes it the only part usable for diffing against
+retail.
+
 ---
 
 ## 8+. Reserved for later confirmed findings
@@ -554,4 +594,6 @@ at project start.
 | 18 | Capture the `--secure` session and re-run the §8 Carrier decoder over it. | Carrier framing no longer visible. | **Confirmed.** 0/30 parse as Carrier; 30/30 parse as DTLS 1.2 ApplicationData at epoch 1. |
 | 19 | Search the `--secure` capture for the literal payload string. | Absent if encryption is real. | **Confirmed absent — 0 datagrams.** This, not the PASS line, is what establishes the traffic is actually encrypted. |
 | 20 | Rebuild archives from scratch after `build/` was deleted, re-run plaintext capture. | Byte-identical traffic. | **Confirmed.** Datagram 2 reproduced exactly (`00 02 a0 00 05 03 ...`). The build is reproducible from the pinned commit; `build/` is safe to delete. |
+| 21 | Decode a `--secure` capture taken from before the session opens. | ApplicationData only, as in the earlier mid-session capture. | **Richer than expected.** Caught the full cookie exchange at epoch 0: ClientHello (DTLS1.2) / HelloVerifyRequest (DTLS**1.0**) / ClientHello with the 20-byte cookie echoed. Confirms §7's pre-T4 reading of the `HandshakeHeader`. See §9. |
+| 22 | Search the `--secure` capture for the literal payload string, on the target machine. | Absent. | **Confirmed, 0 matches.** Note `grep -c` exits 1 on a zero count, so the shell reports an error on success — the count is the result, not the exit code. |
 
