@@ -1,2 +1,10 @@
 build/*
 !build/*.pcap
+
+# Amazon client assets — extraction is local research only, never committed (CHARTER §3)
+*.datasheet
+*.pak
+*.rda
+assets/
+extracted/
+datasheets/
