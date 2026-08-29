@@ -34,10 +34,10 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                             | Depends on | Deliverable                                                              |
 | ----- | ------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
-| `[ ]` | **T1** Engine fingerprint (static)                | —          | **A document.** GridMate vs O3DE-`AzNetworking` vs rewrite, with evidence |
-| `[ ]` | **T2** Crypto-library fingerprint                 | —          | **A document.** OpenSSL / mbedTLS / CNG, and where the boundary is        |
+| `[x]` | **T1** Engine fingerprint (static)                | —          | **A document.** GridMate vs O3DE-`AzNetworking` vs rewrite, with evidence |
+| `[x]` | **T2** Crypto-library fingerprint                 | —          | **A document.** OpenSSL / mbedTLS / CNG, and where the boundary is        |
 | `[ ]` | **T3** Transport recon (Wireshark, no hooks)      | —          | Transport, ports, packet-size and entropy profile                        |
-| `[ ]` | **T4** Build the reference `Carrier` from the fork | —          | A two-process GridMate session we control, captured                       |
+| `[x]` | **T4** Build the reference `Carrier` from the fork | —          | A two-process GridMate session we control, captured                       |
 | `[ ]` | **T5** Reference vs retail handshake diff          | T1, T4     | **The chunk that answers §1's core question.** Header layout, or a rewrite verdict |
 
 ### Track H — Hooking. Get to plaintext, framed messages. Proven on the reference build first.
