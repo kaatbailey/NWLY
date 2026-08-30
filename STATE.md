@@ -1800,6 +1800,16 @@ Request headers on both (structure only, values redacted):
   endpoint under `tokenservice.amazongames.com`.
 - `x-amz-content-sha256`, `x-amz-date`, `x-amz-api-version: 2017-09-26`.
 
+**Login is Steam-inherited, not entered (confirmed 2026-08-30).** New World has no
+in-game sign-in prompt and no account switch because identity comes from the Steam
+session: the client presents a per-session **Steam auth ticket** (the `SteamAuthTicket`
+hex in the frame-2514 body) and exchanges it — EOS `oauth/token` → `tokenservice`
+JWT → STS — for the game's own credentials. Switching accounts means switching Steam
+sessions. **Consequence for P0b:** every re-capture carries a *fresh* ticket, JWT, and
+STS token, so the whole chain replays inside the window on a cold launch — which is the
+same cold launch that forces the full TLS handshake OPEN-1 needs. The two requirements
+coincide; do not attempt P0b from a resumed session.
+
 **S1a-relevant:** the world connection carries no visible token in the DTLS handshake
 (§12B), so whatever authorises the client to the world server is either issued in the
 frame-2648 response or carried in the first epoch-1 Carrier message. Unresolved.
