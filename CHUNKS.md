@@ -3,6 +3,40 @@
 Companion to `CHARTER.md` and `STATE.md`. This file holds the work breakdown and
 the ready-to-paste prompt for each chunk.
 
+> **Repair note — 2026-08-30. The exact failure this file's own closing section
+> warns about, repeated.** T3 and T5 both completed on 2026-08-29 and both index
+> rows were still sitting at `[ ]`, with T3 marked `← NEXT` and the Order section
+> still reading "Next: T3 → T5" — while `STATE.md` carried both as complete (§12A,
+> §12B). A session pasted this file alongside `STATE.md` would have received two
+> contradictory accounts of where the project is, and the cheapest wrong move
+> available was re-running a chunk that was already done. Changes: **T3 and T5
+> ticked `[x]`** with pointers into STATE; **DONE banners added to both prompt
+> bodies**, bodies kept verbatim; claims inside those prompts that their own chunk
+> or T5 falsified marked **SUPERSEDED** inline; `T5_PROMPT.md` added to the
+> standalone-prompt list; the T5-depends-on-T3 repair note marked resolved; the
+> Track H note about H2 running "mostly blind" superseded (T5 landed, so H2's
+> falsification check is armed); H1's signature-scan suggestion **promoted to a
+> requirement**; P1's scope narrowed to what T5 did not already document; the
+> Order section replaced (stale planning prose, no findings in it — same treatment
+> and same rationale as `STATE.md` §1–§3 on 2026-08-29). One **proposal** added
+> under Track S, explicitly marked as awaiting an owner decision and not acted on
+> *(that proposal was subsequently **adopted** later the same day — see below)*.
+>
+> **Second amendment, same day — GATE-1 resolved by owner decision.** H3 removed
+> from the critical path and ordered last; three chunks created (**P0** auth-phase
+> decode, **S0** redirection feasibility, **S1a** DTLS server); S1 split into
+> S1a/S1b; P1's dependency changed from H3 to "S1a or H3"; H3's index row and prompt
+> re-banned­ered as LAST RESORT with a terminal-result bound; Order section rewritten
+> around the no-EAC-first sequence. Reasoning is STATE §3; the work order is
+> STATE §15. **No chunk was marked complete and no finding was altered — this is a
+> sequencing change.**
+>
+> **No prose was deleted.** The only text overwritten in place is the six index-table
+> status rows and the T3 prompt's `← NEXT` header — which is precisely what "tick the
+> row, add a DONE banner" means, and none of it carried a finding. Everything else
+> that changed is struck through with its replacement beside it, including the four
+> paragraphs of the old Order section, quoted back verbatim.
+
 > **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
 > Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
 > missing); the Standing environment notes filled in with real values; completed
@@ -33,7 +67,8 @@ must survive; the prompt is disposable. If a future session only reads one
 document, it should be the charter.
 
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
-its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `D2_PROMPT.md`). Where one exists,
+its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`).
+Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
 not the summary.
 
@@ -49,47 +84,97 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 | ----- | ------------------------------------------------- | ------------ | ------------------------------------------------------------------------ |
 | `[x]` | **T1** Engine fingerprint (static)                | —            | **DONE 2026-08-29.** GridMate confirmed. STATE §10                        |
 | `[x]` | **T2** Crypto-library fingerprint                 | —            | **DONE 2026-08-29.** OpenSSL 1.1.1k, static, `SSL_read`/`SSL_write`. STATE §10 |
-| `[ ]` | **T3** Transport recon (retail capture, no hooks) | —            | **NEXT.** Transport, ports, epoch-0 handshake, size/timing profile. Prompt: `T3_PROMPT.md` |
+| `[x]` | **T3** Transport recon (retail capture, no hooks) | —            | **DONE 2026-08-29.** UDP/DTLS 1.2 via `SecureSocketDriver`; P1–P4 confirmed; epoch-0 pcap saved. STATE §12A. Prompt: `T3_PROMPT.md` |
 | `[x]` | **T4** Build the reference `Carrier` from the fork | —           | **DONE 2026-08-29.** Plaintext + DTLS both pass and captured. STATE §7–§9 |
-| `[ ]` | **T5** Reference vs retail handshake diff         | T1, **T3**, T4 | **The chunk that answers §1's core question.** Header layout, or a rewrite verdict |
+| `[x]` | **T5** Reference vs retail handshake diff         | T1, **T3**, T4 | **DONE 2026-08-29. THE MILESTONE — the charter's core question is answered.** Stock GridMate `SecureSocketDriver`, zero catalogued exceptions; reference validated as an instrument. STATE §12B. Prompt: `T5_PROMPT.md` |
 
-> **T5's dependency on T3 was missing from this table until 2026-08-29.** T5 diffs
+> **Track T is complete.** T1, T2, T3, T4, T5 all landed. What remains in the
+> transport layer is Track H, which supplies the epoch-≥1 plaintext that T5's
+> verdict licenses P-track to interpret.
+
+> ~~**T5's dependency on T3 was missing from this table until 2026-08-29.** T5 diffs
 > the reference epoch-0 handshake (T4, STATE §9) against the *retail* epoch-0
 > handshake, and the only source of the latter is T3's capture. T5 cannot start
-> before T3 lands.
+> before T3 lands.~~ **RESOLVED 2026-08-29** — the dependency was correct and was
+> honoured: T3 ran first and produced `t3_handshake_epoch0.pcap`, which was T5's
+> retail input. Kept as the record of a real near-miss in the work breakdown.
 
 ### Track H — Hooking. Get to plaintext, framed messages. Proven on the reference build first.
 
 |       | Chunk                                          | Depends on | Deliverable                                                          |
 | ----- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `[ ]` | **H1** Frida crypto hook on the reference build | T2, T4     | `SSL_read`/`SSL_write` plaintext logged from a target we control     |
-| `[ ]` | **H2** Locate the dispatch point in retail (static) | T1, (T5) | Ghidra: the message-type switch or handler table                   |
-| `[!]` | **H3** Crypto/dispatch hook on retail           | H1, H2, T2 | Blocked on H1+H2. Raw bytes + timestamp + direction + conn-id to file |
+| `[ ]` | **H1** Frida crypto hook on the reference build | T2, T4     | `SSL_read`/`SSL_write` plaintext logged from a target we control. **Now also: prove the signature scan here** — see the prompt |
+| `[ ]` | **H2** Locate the dispatch point in retail (static) | T1, ~~(T5)~~ **T5 done** | Ghidra: the message-type switch or handler table. **Falsification check is now armed, not deferred** |
+| `[~]` | **H3** Crypto/dispatch hook on retail           | H1, H2, T2 | **LAST RESORT — deliberately deprioritised 2026-08-30, not blocked.** Only if P0/S0/S1a/H2/H4 are exhausted. One attempt; EAC prevention is terminal. STATE §3, §15 |
 | `[ ]` | **H4** The reflection reader (`SerializeContext`) | T1       | **Decision gate + prototype.** Only if the ABI proves traversable    |
 
-> **H2 can start now.** Its hard input is T1, which is complete. T5 is only needed
+> ~~**H2 can start now.** Its hard input is T1, which is complete. T5 is only needed
 > for H2's *falsification* check at the end (does the xref chain resemble
 > `Carrier::Receive` → `ReplicaManager`), so H2 can run mostly blind and be
 > confirmed once T5 lands. It needs no login, no running client, and no live
-> servers — which makes it the fallback if T3 stalls.
+> servers — which makes it the fallback if T3 stalls.~~
+>
+> **SUPERSEDED 2026-08-30 — T3 and T5 both landed.** H2 no longer runs blind and is
+> no longer a fallback for a stalled T3. Both consequences are live:
+> **(a)** the falsification check is now a real test with a known answer behind it —
+> T5 proved the transport is stock GridMate `SecureSocketDriver` (STATE §12B), so an
+> xref chain that does *not* resemble `Carrier::Receive` → `ReplicaManager` means the
+> static analysis is wrong, no longer that T1 might be. **(b)** H2 remains the one
+> H-track chunk needing no login, no running client, and no Proton — which is now an
+> argument for sequencing it *first*, not a contingency. See the note under Order.
 
 ### Track P — Protocol. What the messages mean. Built on captures, not guesses.
 
 |       | Chunk                                     | Depends on | Deliverable                                     |
 | ----- | ----------------------------------------- | ---------- | ----------------------------------------------- |
-| `[ ]` | **P1** Handshake sequence                 | T5, H3     | The connect exchange, byte-documented           |
-| `[ ]` | **P2** Message-type census                | H3         | The dispatch table as a list of known types     |
-| `[ ]` | **P3** Position/movement message          | H3, P2     | The controlled-walk experiment, decoded         |
-| `[ ]` | **P4** Initial world-state sync           | H3, P2     | The login state dump, the biggest single message |
+| `[ ]` | **P0** Auth-phase decode (TCP/443)        | —          | **NEW 2026-08-30, unblocked, no EAC contact.** The keylog already decrypts this flow (§12A, test #41) and nobody has read it. Login → server list → session token → **the world-address handoff**, which S0 depends on |
+| `[ ]` | **P1** Handshake sequence                 | ~~T5~~ **T5 done**, ~~H3~~ **S1a or H3** | The connect exchange, byte-documented. **Scope narrowed — the epoch-0 DTLS half is already byte-documented in STATE §12B; what remains is the GridMate `Carrier` handshake inside epoch ≥ 1.** Reachable from S1a's plaintext for the client→server half without H3 |
+| `[ ]` | **P2** Message-type census                | ~~H3~~ **H2, or S1a, or FIND-2** | The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3 |
+| `[ ]` | **P3** Position/movement message          | ~~H3~~ **S1a or H3**, P2 | The controlled-walk experiment, decoded. Outbound position messages arrive as plaintext at an S1a server; H3 only adds the inbound half |
+| `[ ]` | **P4** Initial world-state sync           | **H3**, P2 | The login state dump. **Genuinely needs H3** — this one is server→client, the direction S1a cannot observe. Expect to construct rather than capture it |
 | `[ ]` | **P5** Replica/chunk model                | T1, H4     | How replicated objects map to the wire          |
 
 ### Track S — Server. Speak back to the client.
 
 |       | Chunk                                       | Depends on | Deliverable                          |
 | ----- | ------------------------------------------- | ---------- | ------------------------------------ |
-| `[!]` | **S1** Complete a handshake                 | P1         | Client reaches "connected"           |
-| `[!]` | **S2** Stand a character in the world       | S1, P4     | A character loads and renders         |
+| `[ ]` | **S0** Redirection feasibility              | P0         | **NEW 2026-08-30, no EAC contact.** Can the client be pointed at a world server we run? Hosts/DNS on our own machine. Cheap, and everything below rests on it |
+| `[ ]` | **S1a** DTLS server (epoch 0)               | T5         | **NEW 2026-08-30, unblocked, no EAC contact.** Fully specified by §12B. **The inversion: when the client handshakes with us we hold the session keys, so its messages arrive as plaintext on our socket** — this replaces H3 for the client→server half |
+| `[!]` | **S1b** Carrier handshake (epoch ≥ 1)       | S1a, P1    | The GridMate `DefaultHandshake` / connection request-ack inside the encrypted channel |
+| `[!]` | **S2** Stand a character in the world       | S1b, P4    | A character loads and renders         |
 | `[!]` | **S3** Movement round-trips                 | S2, P3     | The client can move and see it persist |
+
+> ~~**PROPOSAL — 2026-08-30, not acted on. Owner decision required; the index above is
+> unchanged pending it.**~~ **ADOPTED 2026-08-30.** The proposal below argued for
+> splitting S1 into an unblocked DTLS half and a blocked Carrier half. The GATE-1
+> decision settled it: with H3 off the critical path, S1a is no longer a parallel
+> nicety — **it is the primary route to client→server plaintext.** Rows created
+> above. The counter-case recorded below (that it opens a fourth track and CHARTER
+> §1's layering exists to stop server work outrunning protocol understanding) still
+> stands and is answered thus: S1a builds only what T5 already *proved*, and it is
+> the instrument by which protocol understanding is obtained rather than a guess
+> that runs ahead of it. Original text kept:
+>
+> STATE §12B fully specifies the **DTLS layer** of a server, from source plus two
+> captures: `DTLSv1_2_method` (pinned, not `DTLS_method`), single suite `0xC030`,
+> `SSL_OP_NO_QUERY_MTU`, GridMate's own 20-byte HMAC-SHA1 cookie generated and
+> verified **at the datagram layer before OpenSSL sees it**, a hand-built
+> HelloVerifyRequest with `RecordHeader::m_version` hardcoded to `fe ff`, a
+> HelloRequest sent once the cookie verifies with exponential backoff capped at
+> 1000 ms, and a CertificateRequest that accepts an **empty** client Certificate.
+> None of that needs H3. All of it is testable against the reference `Carrier`
+> client we already build — which is CHARTER §4's "prove it on the reference build
+> first" reaching S-track for the first time.
+>
+> What genuinely needs P1/H3 is the **GridMate `Carrier` handshake inside epoch 1**.
+>
+> Splitting **S1a** (DTLS server — unblocked, testable now against the reference
+> client) from **S1b** (Carrier handshake — blocked on P1) would put real S-track
+> work on the board in parallel with H-track, rather than holding the entire server
+> behind a hook that has an unsolved Proton problem in front of it. The counter-case
+> is that it opens a fourth active track and CHARTER §1's layering exists precisely
+> to stop server work outrunning protocol understanding. Recorded here so the option
+> is not lost; **do not create S1a/S1b rows without an explicit decision.**
 
 ### Track D — Sustaining.
 
@@ -100,18 +185,82 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 ### Order — where the project actually is
 
-**T1, T2, T4 and D2 are complete.** The engine question is settled (GridMate), the
-crypto boundary is located (`SSL_read`/`SSL_write`, statically linked), the
-reference instrument is built and captured, and Track S has its content source.
+**Rewritten 2026-08-30.** The previous text ("Next: T3 → T5") described the
+pre-T3 position and contained no findings, only stale planning — replaced on the
+same rationale and with the same precedent as `STATE.md` §1–§3. It read, verbatim:
 
-**Next: T3 → T5.** T3 is the last input T5 needs. T5 is the milestone — it answers
-the charter's one-sentence question by diffing the retail epoch-0 handshake
-against the reference one.
+> ~~**T1, T2, T4 and D2 are complete.** The engine question is settled (GridMate), the
+> crypto boundary is located (`SSL_read`/`SSL_write`, statically linked), the
+> reference instrument is built and captured, and Track S has its content source.~~
+>
+> ~~**Next: T3 → T5.** T3 is the last input T5 needs. T5 is the milestone — it answers
+> the charter's one-sentence question by diffing the retail epoch-0 handshake
+> against the reference one.~~
+>
+> ~~**Then Track H opens.** H2 can in fact run in parallel with T3 (see the note
+> above) and is the fallback if T3 is blocked on account or server availability.~~
+>
+> ~~D1 can start whenever; it has a free head start from the pin baseline.~~
 
-**Then Track H opens.** H2 can in fact run in parallel with T3 (see the note
-above) and is the fallback if T3 is blocked on account or server availability.
+**Track T is finished. T1, T2, T3, T4, T5 and D2 are all complete.** The engine
+question is settled (GridMate, STATE §10), the crypto boundary is located
+(`SSL_read`/`SSL_write`, statically linked, STATE §10), the reference instrument is
+built and captured (STATE §7–§9), Track S has its content source (STATE §11), and
+**the charter's core question is answered**: retail transport is structurally stock
+GridMate `SecureSocketDriver` with zero catalogued exceptions, and the reference
+build is a valid instrument for it (STATE §12B).
 
-D1 can start whenever; it has a free head start from the pin baseline.
+**Track H is no longer the whole front.** GATE-1 resolved 2026-08-30 (STATE §3,
+§15): **do everything reachable without contacting EAC first; H3 is a last resort.**
+Not because H3 is off-charter — reading plaintext your own client decrypted is
+reading your own data — but because injection into an EAC-protected process risks
+the account everything else depends on, and working directly in front of a detection
+system watching for exactly that is poor practice. If H3 is ever attempted it is
+attempted **once**; EAC preventing the hook is a **terminal result**, and any step
+aimed at surviving detection is circumvention, off-charter under §3, and does not
+get pursued or recorded.
+
+**The order, none of items 1–7 contacting a running retail client:**
+
+1. **H2** — static Ghidra. Scope it **ambitiously**: with H3 off the critical path
+   this is a primary source of protocol structure, not just a hook-targeting step.
+2. **P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. Possibly schemas
+   for free, from the binary, with no capture at all.
+3. **P0** — auth-phase decode. Already decrypts; never read. Yields the
+   world-address handoff.
+4. **S0** — redirection feasibility. Cheap, and S1a rests on it.
+5. **S1a** — the DTLS server. **The inversion:** the client handshakes with us, we
+   hold the keys, its messages arrive as plaintext on our socket.
+6. **H1** — reference-build hook and signature scan. Our binary, and the last free
+   oracle for the scan.
+7. **H4** — reflection-reader decision gate. Static, independent, a "no" is as
+   useful as a "yes".
+8. **H3** — last resort only.
+
+**Start with H2 or P0.** H2 needs nothing and no client. P0 needs only the keylog
+capture you already have. Neither depends on the other.
+
+**What this order does not yield** is the server→client direction in captured form.
+Items 1–7 give the client's outbound messages plus whatever comes out of the binary;
+the inbound half is what S-track must construct regardless, with H2 and FIND-2 as
+the substitute for observing it.
+
+**D1 can start whenever**; it has a free head start from the `pins/22469132/Bin64.sha256`
+baseline (STATE §5), and it earns its keep the moment any offset is hardcoded.
+
+**Open items now live in `STATE.md`'s register, per CHARTER §6.6** — including the
+H3 gate, the `decode_carrier.py` ChangeCipherSpec gap, and the unused auth-phase
+decryption. Do not track them here; this file routes chunks, it does not hold state.
+
+> **Correction, 2026-08-30.** A paragraph here previously described `SSLKEYLOGFILE`
+> as an unexploited opportunity that "no chunk owns." That was wrong and it was
+> written by a session reasoning from its own inference rather than from a document
+> — the exact failure CHARTER §6.3 now names. The keylog was a scoped T3 recon item;
+> it ran on 2026-08-29, produced a split result (auth decrypts, world stream does
+> not), received its falsification check, and is recorded in STATE §12A, test #41,
+> and a §13 correction row. What is genuinely open is narrower: **nobody has decoded
+> the auth flow's contents.** That is now an entry in the STATE register, not a note
+> here.
 
 ---
 
@@ -282,7 +431,18 @@ hook above, which changes the whole H-track.
 
 ---
 
-## T3 — Transport recon (retail capture, no hooks) ← NEXT
+## T3 — Transport recon (retail capture, no hooks) ✅ DONE 2026-08-29
+
+> **COMPLETE. Findings in STATE §12A. Do not re-run.**
+> Verdict: the world connection is **UDP/DTLS 1.2 via `SecureSocketDriver`**, not
+> `StreamSecureSocketDriver`/TCP-TLS — settling the STATE §7 question. Flow
+> `192.168.1.33:27001 ↔ 52.223.16.88:54888` (AWS). Predictions 1–4 all confirmed;
+> **prediction 4 held**, the retail ClientHello offers exactly one real suite
+> `0xC030` plus `0x00FF` (SCSV, not a cipher). `decode_carrier.py` handled retail
+> **unmodified** (test #40 — the predicted loopback/offset break did not occur).
+> Epoch-0 handshake saved as `t3_handshake_epoch0.pcap`, which became T5's retail
+> input. **Two claims below are marked SUPERSEDED inline** — both were corrected by
+> T5, and both are in STATE §13. Prompt kept as historical record.
 
 > **The full ready-to-run prompt is `T3_PROMPT.md`. Paste that file, not this
 > summary.** What follows is the scope in brief, plus the reasons this chunk is
@@ -306,9 +466,22 @@ chunk, and a capture answers it with no hooks.
 
 1. Game stream is **UDP**; auth and server-list are a separate TCP/443 phase.
 2. UDP payloads parse as **DTLS 1.2 records**, `decode_carrier.py` unmodified.
-3. Opening exchange is ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) →
+3. ~~Opening exchange is ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) →
    ClientHello with cookie echoed. **The 1.0 HVR is correct**, RFC 6347 §4.2.1 —
-   not a downgrade, do not chase it.
+   not a downgrade, do not chase it.~~
+   **CONFIRMED but INCOMPLETE in two ways — SUPERSEDED by T5, STATE §13.**
+   (a) The RFC explanation is permitted but is not the actual cause: GridMate
+   **hardcodes** `RecordHeader::m_version = DTLS1_VERSION` (`0xFEFF`) in its
+   hand-packed records (`SecureSocketDriver.cpp:308`, `:312`, `:343`). That moves
+   `fe ff` out of the "library/RFC default" bucket and into the **GridMate-controlled**
+   bucket, where it matches retail exactly. Diagnostic value: **every `fe ff` record
+   in a capture is a GridMate hand-pack**, and there are exactly two per handshake
+   (HelloVerifyRequest, HelloRequest). The advice not to chase it still stands.
+   (b) The exchange does not stop there. The real sequence, identical on retail and
+   reference, is `CH(seq0, no cookie) → HVR(seq0) → CH(seq1, cookie=20) →
+   HelloRequest(seq0) → CH(seq0, no cookie) → ServerHello…`. **Three ClientHellos,
+   not two**, and the handshake OpenSSL actually completes carries **no cookie at
+   all**.
 4. **The retail ClientHello advertises exactly one cipher suite, `0xC030`**
    (`ECDHE-RSA-AES256-GCM-SHA384`), because GridMate hardcodes it at
    `SecureSocketDriver.cpp:1494`.
@@ -463,10 +636,29 @@ and the state of the DTLS-on-Linux path. Fold into STATE §5 and §7.
 
 ---
 
-## T5 — Reference vs retail handshake diff
+## T5 — Reference vs retail handshake diff ✅ DONE 2026-08-29 — THE MILESTONE
+
+> **COMPLETE. Findings in STATE §12B. Do not re-run.**
+> **The full ready-to-run prompt is `T5_PROMPT.md`** — richer than this summary,
+> and it is the one that was actually executed.
+> **Verdict: retail transport is structurally stock GridMate `SecureSocketDriver`
+> with zero catalogued exceptions.** Every handshake difference between retail
+> (buildid 22469132) and the reference (`7d4f1ee6`) is OpenSSL 1.1.1k-vs-3.6.4
+> noise in fields `SecureSocketDriver.cpp` does not set. **Mutual auth is stock
+> GridMate, not Amazon-added**, and rests on an inverted branch at `:1525` that
+> *assigns* `SSL_VERIFY_FAIL_IF_NO_PEER_CERT` instead of OR-ing it. **The reference
+> build is a valid instrument for retail's transport**, epoch 0 only. P1–P4 all
+> confirmed. Offline throughout: two pcaps and one source file, no client launch,
+> no hooks, no decryption — CHARTER §3 satisfied.
+> **Outcome 1 of the three in "Definition of done" below is the one obtained.**
+> Strongest single result: a **byte-identical 25-byte HelloRequest** across retail
+> and reference, a GridMate hand-pack that no OpenSSL version difference could
+> produce. Four beliefs were overturned and are in STATE §13. Prompt kept as
+> historical record.
 
 **This is the chunk that answers the charter's core question.** Depends on T1
-(done), **T3** (the retail capture — not yet run), and T4 (done).
+(done), ~~**T3** (the retail capture — not yet run)~~ **T3 (done 2026-08-29 —
+`t3_handshake_epoch0.pcap` was the retail input)**, and T4 (done).
 
 **Both inputs are specific artefacts, not vibes:**
 
@@ -491,11 +683,19 @@ the diff starts, and T5 becomes confirmation plus field-level documentation.
 **Definition of done.** One of:
 - **Structural match** → the client is GridMate or a close fork; the `Carrier`
   header layout is now the retail protocol's header layout, documented for free.
+  **← THIS IS THE OUTCOME OBTAINED, 2026-08-29. STATE §12B.**
 - **No match, O3DE strings present** → an `AzNetworking` rewrite. *Note: T1 already
   ruled this out, so this outcome would mean T1 was wrong — investigate the
-  contradiction rather than accepting it.*
+  contradiction rather than accepting it.* **Did not occur.**
 - **No match, neither** → a bespoke protocol; the reference build degrades to "AZ
-  reflection may still help" and P-track is fully empirical.
+  reflection may still help" and P-track is fully empirical. **Did not occur.**
+
+**Caveat on the match, carried forward (STATE §12B).** It is proven for **epoch 0**,
+the cleartext handshake. Epoch ≥ 1 Carrier framing inside DTLS is proven on the
+reference and **inferred** for retail; H3's plaintext is what promotes it. Content
+(certificate sizes 958 vs 1380, cookie values, randoms) is per-deployment and
+per-connection — do not treat any observed value as constant. Fragmentation
+differences between the two captures are PMTU-dependent, not protocol-dependent.
 
 **Falsification.** T1 said GridMate, which predicts a structural match. **If the
 handshakes don't line up at all, one of T1 or T5 is wrong — find out which before
@@ -524,13 +724,25 @@ id to a binary file. Confirm the logged plaintext matches the
   attaches trivially. Retail (H3) is a **PE process under Proton/Wine**, which is
   a different and harder problem. Solve it in H3, not here, but know it is coming.
 - Retail's OpenSSL is **statically linked** (STATE §10), so H3 will need a
-  signature scan rather than a symbol lookup. Consider proving the
+  signature scan rather than a symbol lookup. ~~Consider proving the
   signature-scanning approach here too, where a known-good answer exists to check
-  it against.
+  it against.~~ **AMENDED 2026-08-30 — this is now a requirement, not a
+  suggestion.** Two things changed it. First, T5 established that the reference is
+  a valid instrument for retail's transport (STATE §12B), so a technique proven
+  here can be trusted to transfer — which is the whole reason to prove it here.
+  Second, and more practically: **H1 is the last chunk in which a free oracle
+  exists.** The reference binary has full symbols, so `Module.findExportByName`
+  gives the known-good address that the signature scan must independently
+  reproduce. In H3 there is no symbol to check the scan against, so a scan that is
+  subtly wrong there is indistinguishable from "the client didn't send it" —
+  CHARTER §4's instrument-cap rule, in the specific. Build the scanner here, or
+  build it blind later.
 
 **Definition of done.** A Frida script that captures the full bidirectional
 plaintext stream from the reference build, verified against the known plaintext.
-This script is the template H3 adapts for retail.
+This script is the template H3 adapts for retail. **Plus (added 2026-08-30): a
+signature scan that locates `SSL_read`/`SSL_write` in the reference binary and is
+verified to land on the same addresses the symbol table gives.**
 
 **Falsification.** The plaintext you log with `SecureSocketDriver` enabled must
 match the cleartext capture with it disabled. If it doesn't, the hook is on the
@@ -542,9 +754,13 @@ wrong function or after the wrong transform.
 
 ## H2 — Locate the dispatch point in retail (static)
 
-Depends on T1 (done). T5 is needed only for the falsification check at the end —
-**this chunk can start now**, and is the fallback if T3 is blocked. **Static
-only** — no execution, no login, no running client.
+Depends on T1 (done). ~~T5 is needed only for the falsification check at the end —
+**this chunk can start now**, and is the fallback if T3 is blocked.~~
+**AMENDED 2026-08-30 — T5 is done (STATE §12B), so the falsification check below is
+armed rather than deferred, and this chunk is no longer a fallback for anything.**
+It is static, needs no login, no running client and no Proton, which now makes it
+the natural first H-track chunk rather than a contingency. **Static only** — no
+execution, no login, no running client.
 
 **Scope.** In Ghidra, work forward from `recvfrom`/`WSARecvFrom`: xref the call
 site (the `SocketDriver::Receive` equivalent), follow the output buffer through
@@ -565,17 +781,46 @@ is the game transport.
 offset — charter §4), and, if it's a table, the table extracted as a list of
 (type-id → handler-address) pairs. Each entry is a message type that exists.
 
-**Falsification.** If GridMate (T1 says so, T5 will confirm), the path should pass
+**Falsification.** ~~If GridMate (T1 says so, T5 will confirm), the path should pass
 through `Carrier::Receive` and a `ReplicaManager` receive entry. If the xref chain
 doesn't resemble that, revisit whether T1's verdict was right — do not just accept
-the mismatch.
+the mismatch.~~
+**AMENDED 2026-08-30 — T5 confirmed it.** The path should pass through
+`Carrier::Receive` and a `ReplicaManager` receive entry. **The "maybe T1 was wrong"
+branch is closed:** T1 said GridMate from strings and RTTI, and T5 then proved the
+transport is stock GridMate `SecureSocketDriver` on the wire, byte-for-byte against
+a build we control (STATE §12B). Two independent methods agree. So an xref chain
+that does not resemble that shape means **the static analysis is wrong** — wrong
+`recvfrom` call site, wrong module, or the chain lost in a thunk — not that the
+engine verdict is in doubt. Do not accept the mismatch, and do not reopen T1 to
+explain it.
 
 **Non-goals.** No hooking. No decoding handler bodies — P2 does that with captures.
 Nothing touching EAC, which lives in `<install>/EasyAntiCheat/` (charter §3).
 
 ---
 
-## H3 — Crypto/dispatch hook on retail 🚫 BLOCKED
+## H3 — Crypto/dispatch hook on retail ⏸ LAST RESORT
+
+> **DEPRIORITISED 2026-08-30 by owner decision (GATE-1, STATE §3 §15). Not blocked
+> — deliberately ordered last.** Do not run this until H2, P2/FIND-2, P0, S0, S1a,
+> H1 and H4 are exhausted. Two reasons, neither being that H3 is off-charter:
+> **(a)** injection into an EAC-protected process is a well-known ban trigger
+> regardless of intent, and the account is load-bearing for auth captures, world
+> captures and any handshake testing; **(b)** operating directly in front of a
+> detection system watching for exactly this is poor practice even where permitted.
+>
+> **The bound, if it is ever attempted:** one attempt, plainly made. **EAC
+> preventing the hook is a TERMINAL RESULT** — record it and stop. Any step whose
+> purpose is to make the hook survive detection is circumvention, off-charter under
+> CHARTER §3, and does not get pursued, recorded, or built on. No second attempt
+> with a different technique.
+>
+> **What replaces it:** S1a inverts the problem — the client handshakes with a
+> server we run, we hold the session keys, and its messages arrive as plaintext on
+> our socket with no hook at all. That covers the client→server half; H2 and FIND-2
+> cover structure. H3's unique remaining value is the **server→client** direction
+> observed live, which is the only reason it survives at all.
 
 **Blocked on H1 and H2.** Do not start until both land.
 
@@ -589,6 +834,27 @@ so they can be piped into Wireshark with a growing Lua dissector.
 as a PE process under Wine (STATE §5). Attaching Frida to that is materially
 different from attaching to the native reference build, and it should be treated
 as the opening question of the chunk rather than a detail.
+
+**What T5 changed here, and what it did not (added 2026-08-30).** T5 changed one
+thing: the reference build is now a *validated* model for retail's transport (STATE
+§12B), so an H1 hook proven against it can be trusted to transfer, and the epoch-≥1
+plaintext this chunk produces is expected to be §8 `Carrier` framing. T5 changed
+**nothing** about the mechanics — retail's OpenSSL is still static, the target is
+still a PE under Wine, and the hook must still be located by signature. Note also
+that T5 removed one possible shortcut permanently: the keylog callback is absent
+from the DTLS context because **stock GridMate never had one** (STATE §12B, §13),
+not because Amazon stripped it. There is nothing to re-enable. This hook is the only
+route to the world stream's plaintext.
+
+**Before starting this chunk, settle the §3 question explicitly rather than in
+passing.** H1 and H2 are clean — one targets a native binary we compile, the other
+is static analysis of a file on disk. H3 is the first chunk that attaches to the
+running retail client, and `<install>/EasyAntiCheat/` is loaded in that process.
+CHARTER §3 rules out anti-cheat work absolutely and permanently, which means this
+chunk cannot be allowed to drift into "and then work around what fights the hook."
+Decide up front what H3 is permitted to be — and if the answer is that it cannot run
+without engaging an integrity system, that is a finding to record, not an obstacle
+to route around.
 
 Expect the retail client to carry runtime protections the reference build does not
 — note what fights the hook, but per charter §3 do not engage anything that is an
@@ -637,7 +903,14 @@ altering the client.
 Write the full prompt when the chunk comes up, using the shape above.
 
 - **P1 Handshake sequence.** Byte-document the connect exchange from H3 captures,
-  cross-referenced against T5's header layout.
+  cross-referenced against T5's header layout. **Scope narrowed 2026-08-30: the
+  epoch-0 DTLS half is already done.** STATE §12B documents that flight completely
+  and identically on both sides — `CH(seq0, no cookie) → HVR(seq0) → CH(seq1,
+  cookie=20) → HelloRequest(seq0) → CH(seq0, no cookie) → SH(0) Cert(1) SKE(2)
+  CertReq(3) SHD(4) → Cert(1, empty) CKE(2) → [CCS] → NewSessionTicket(5)` — with a
+  13-byte `RecordHeader` and 12-byte `HandshakeHeader`. What P1 still owes is the
+  **GridMate `Carrier` handshake inside epoch 1** (`DefaultHandshake`, connection
+  request/ack, and the `Carrier` header on real traffic), and that is what needs H3.
 - **P2 Message-type census.** Turn H3's dispatch-table hits into a list of known
   message types with frequencies. **T1 found `google::protobuf::Reflection::` in
   `NewWorld.exe` itself** (not in EAC or Vivox — both scanned, both zero), so
@@ -656,7 +929,17 @@ Write the full prompt when the chunk comes up, using the shape above.
   new-world-tools kit would likely say a lot about the replicated-object model.
   Recorded, not acted on. STATE §11.
 - **S1–S3.** Server work, all blocked on the corresponding P-track chunks. Prompts
-  when P1/P3/P4 resolve. Content source is ready (D2).
+  when P1/P3/P4 resolve. Content source is ready (D2). **T5 handed S-track three
+  hard requirements and removed one (STATE §12B):** the server must run GridMate's
+  own 20-byte cookie exchange at the datagram layer — enabling OpenSSL's cookie
+  callbacks is **not** equivalent and will not interoperate; it must send a
+  HelloRequest once the cookie verifies, with backoff, or the client stalls at
+  `message_seq 1` waiting for a ServerHello that never comes; and it must send a
+  CertificateRequest and accept an **empty** client Certificate. **Removed:** there
+  is no client-certificate PKI and no embedded cert to find in `NewWorld.exe` — the
+  client presents nothing. Neither of the first two behaviours is derivable from
+  RFC 6347; they are GridMate's own sequencing. **See the marked PROPOSAL under
+  Track S** on splitting S1 into an unblocked DTLS half and a blocked Carrier half.
 - **D1 Signature-scan harness.** So offsets survive a client patch. **Head start:**
   `pins/22469132/Bin64.sha256` plus `sha256sum -c` already gives a per-file list of
   which binaries a patch touched (STATE §5). Worth finishing the moment H3 has more
@@ -716,3 +999,34 @@ the next session the list of things worth checking.
 to the prompt, and mark any claim inside the prompt that the chunk falsified. A
 stale prompt is how a future session rebuilds something that already exists — the
 T1/T2/T4 rows sat at `[ ]` for a full session after they were complete.
+
+**This has now happened twice. 2026-08-30.** T3 and T5 both landed on 2026-08-29,
+both were folded into `STATE.md` as §12A and §12B, and both index rows here were
+still `[ ]` — with T3 additionally flagged `← NEXT` and the Order section still
+routing the reader to it. The warning above was written *about the first
+occurrence* and did not prevent the second, which says the problem is not that the
+rule is unknown but that folding into `STATE.md` feels like completion and this
+file gets left behind.
+
+Two observations, for whatever they are worth. **First: the update is a different
+motion from the fold, and it is the one with no natural trigger.** Writing FINDINGS
+and folding them into `STATE.md` is where the session's attention already is; this
+file is a separate document that nothing in that motion forces you to open.
+**Second: the two files fail differently.** `STATE.md` is append-only, so its worst
+case is clutter — a stale claim sits next to its correction and a reader can see
+both. This file is a *router*: it tells a session what to do next. A stale row here
+does not clutter, it **misdirects**, and it misdirects a session that has been
+deliberately given only one chunk and no way to notice the contradiction. That
+asymmetry is the argument for updating this file *before* folding findings, not
+after — the fold is the part you will not forget.
+
+**As of 2026-08-30 this is CHARTER §6.4, and it is binding rather than advisory.**
+§6 exists specifically because the two paragraphs above were true, were written
+down, and still did not prevent the second occurrence. The rules that bear on this
+file: **§6.4** — tick the row, banner the prompt, and strike through whatever the
+chunk falsified, *before* folding findings into `STATE.md`; a chunk is not complete
+until all three are done. **§6.5** — never tick a row on the strength of remembered
+work; a false `[x]` misdirects exactly as badly as a false `[ ]`. **§6.6** — open
+items belong in STATE's register, not in this file. **§6.7** — where a standalone
+`*_PROMPT.md` exists it *is* the prompt, and it belongs in the repository, not on
+one machine.

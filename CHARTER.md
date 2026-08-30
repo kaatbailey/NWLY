@@ -145,10 +145,132 @@ be in a position to summarise the goal away. The charter is the part that must
 survive; the chunk prompt is disposable. If a future session reads only one
 document, it should be this one.
 
+**This section says what each document is. §6 says what a session does with them** —
+added 2026-08-30, because the rules above proved necessary but not sufficient: they
+kept the goal intact through fourteen sessions and still allowed two days to be
+lost to stale reads and an unticked router.
+
 ---
 
-## 6. Amendment log
+## 6. Session protocol — how the documents stay true
+
+Added 2026-08-30, after two days lost to document failures rather than technical
+ones. What happened, plainly: a session ran to completion against a stale GitHub
+copy and folded findings into a section number that already existed; three
+separate sessions concluded from a single tool result that pushed work was
+unpushed, one of them telling the owner his findings existed on one drive with no
+remote; T3 and T5 both completed while `CHUNKS.md` still routed the next session to
+go run them. None of these was a hard problem. Every one of them cost more than the
+work it interrupted.
+
+**These rules live in the charter for one reason: this is the only document
+guaranteed to be read and guaranteed not to be stale.** A protocol for detecting
+stale documents cannot itself live in a document that goes stale. §5 governs what
+each document *is*; this section governs what a session *does*.
+
+### 6.1 The documents are single-writer and serialized
+
+One session holds the documents at a time. Pull before touching them, push before
+closing. **A session started while another is still open is a fossil** — it will
+read a snapshot, do real work against it, and write conclusions that collide with
+work it cannot see. That is not hypothetical; it happened on 2026-08-29 and
+produced a duplicate §11.
+
+If a session must be abandoned mid-chunk, its findings are still written down
+(6.5) before the next one opens.
+
+### 6.2 `STATE.md` carries a freshness header, and every session verifies it
+
+The first block of `STATE.md` records: last-updated date, the commit it was
+written against, the section count, and the highest test number. A session's
+**first action**, before reading further or proposing anything, is to check those
+four numbers against the working tree.
+
+A mismatch means stop and resolve it. It does not mean proceed carefully.
+
+The point is to make staleness **self-announcing** rather than something a session
+has to suspect. A session cannot be expected to notice that its inputs are three
+days old; it can be expected to compare two numbers.
+
+### 6.3 Claims about our own repository are findings, and obey §4
+
+§4's governing rule — *a belief validated only against your own tooling is not
+validated* — was written about beliefs concerning the client. It applies with equal
+force to beliefs about our own documents and repository state.
+
+"Your work isn't pushed", "that section doesn't exist", "this file is missing" are
+**claims requiring evidence**, and the same standard applies: name what would
+falsify it, run that check, then speak. Specifically, **a rendered GitHub blob page
+is not evidence** — it caches, and it has already returned a three-day-old file
+while the current one sat on `Master`. Use `raw.githubusercontent.com`, the API, or
+`git log origin/Master`.
+
+An alarming conclusion about the project's own state earns *more* verification than
+a mundane one, not less. The cost of being wrong is that the owner starts chasing a
+data-loss scare instead of doing the work.
+
+### 6.4 The router is updated before the findings are folded
+
+`STATE.md` is a **ledger**; `CHUNKS.md` is a **router**. They fail differently, and
+that asymmetry decides the order.
+
+Stale `STATE.md` produces clutter a reader can see through — the wrong claim sits
+next to its correction, both visible. Stale `CHUNKS.md` produces **misdirection**,
+aimed at a session that has deliberately been given one chunk and no way to notice
+the contradiction. It is the more dangerous of the two failures and it is the one
+that gets skipped, because folding findings feels like completion and the router is
+a separate file nothing forces you to open.
+
+So: **tick the row first.** A chunk is not complete until
+
+1. its index row in `CHUNKS.md` is ticked, with a pointer to the STATE section,
+2. its prompt body carries a DONE banner stating the verdict, and
+3. every claim inside that prompt which the chunk falsified is struck through with
+   its replacement beside it — struck through, never deleted (§5).
+
+### 6.5 Unwritten work did not happen
+
+Any work that changed a belief gets a written FINDINGS block **in the session that
+produced it**. Not "I'll fold it tomorrow."
+
+Work that lives only in the owner's memory between sessions is work the next
+session will either re-run or contradict. This is the same drift §5 describes,
+arriving from the other direction: not a session summarising the goal away, but a
+finding that never reached the page.
+
+**Corollary, and it binds hard:** a chunk row is never ticked on the strength of
+remembered work. If the evidence is not written down, the row stays open — a false
+`[x]` misdirects exactly as badly as a false `[ ]`.
+
+### 6.6 Every open item has an owner, or is explicitly marked unowned
+
+`STATE.md` carries an open-items register. Three kinds belong in it:
+
+- **Defects in our own instruments** — e.g. `decode_carrier.py` has no
+  ChangeCipherSpec branch. §4 already says a tool's cap is part of the
+  measurement; a known cap that no chunk owns will eventually be mistaken for a
+  finding about the client.
+- **Findings not yet chunked** — things proven possible and left unused.
+- **Gates** — a question that blocks a chunk and has not been decided. A gate is
+  recorded *as a gate*, with what would resolve it. An undecided question sitting
+  silently in front of the project's critical path is how a track stalls without
+  anyone being able to say when it stalled.
+
+### 6.7 What a session is handed
+
+`CHARTER.md` → `STATE.md` → **one** chunk prompt, in that order, as files — never
+as a summary of any of them, and never as a description of what they say. If a
+chunk has a standalone prompt file, that file is the prompt; the summary in
+`CHUNKS.md` is an index entry, not a substitute.
+
+Prompt files are part of the repository. A prompt that exists only on one machine
+cannot be handed to anything.
+
+---
+
+## 7. Amendment log
 
 | Date       | Change                                                                                                                            |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| <!-- fill --> | Charter created. Transport → protocol → server layering fixed. Reference build named as the primary instrument. Anti-cheat ruled out permanently. Client modification ruled out as a delivery mechanism. |
+| 2026-08-28 | Charter created. Transport → protocol → server layering fixed. Reference build named as the primary instrument. Anti-cheat ruled out permanently. Client modification ruled out as a delivery mechanism. |
+| 2026-08-30 | **§6 added — session protocol.** Written after two days lost to document failures rather than technical ones (stale-snapshot session producing a duplicate §11; three false "your work isn't pushed" conclusions; T3 and T5 complete while `CHUNKS.md` still routed sessions to run them). Seven rules: single-writer sessions, a freshness header on `STATE.md` checked first thing, §4's validation standard extended to claims about our own repo, router-before-ledger ordering, unwritten work does not count, an open-items register covering defects/unchunked findings/undecided gates, and what a session is handed. §5 given a pointer to §6. Amendment-log date filled. **§1–§4 untouched, verified byte-identical.** Authorised by the project owner, who wrote §1's no-AI-regeneration rule and suspended it once, deliberately, for this amendment. |

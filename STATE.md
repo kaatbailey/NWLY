@@ -1,5 +1,40 @@
 # nwproto — AI session handoff
 
+## FRESHNESS HEADER — verify this before reading further (CHARTER §6.2)
+
+| Field | Value |
+| ----- | ----- |
+| Last updated | **2026-08-30** |
+| Written against commit |  |
+| Section count (every `## ` header, this one included) | **18** |
+| Highest test number (§14) | **49** |
+| Highest correction row (§13) | 8 |
+| Chunks complete | T1, T2, T3, T4, T5, D2 |
+| Open gates | **0** — GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
+
+**A session's first action is to check these against the working tree.** Not to
+read on, not to propose anything:
+
+```fish
+cd ~/Documents/NWLY; and git pull
+grep -c '^## ' STATE.md          # expect 17
+grep -oP '^\| \d+ ' STATE.md | tail -1   # expect 49
+git log -1 --format='%h %ad %s' origin/Master
+```
+
+**A mismatch means stop and resolve it. It does not mean proceed carefully.** On
+2026-08-29 a session ran to completion against a three-day-old copy of this file
+and folded its findings into a §11 that already existed. This header exists so that
+staleness announces itself instead of having to be suspected. If these numbers and
+the tree disagree, say so before doing anything else.
+
+**Do not trust a rendered GitHub blob page to answer this** — it caches, and it has
+already served a 272-line pre-T4 version of this file while the 1432-line current
+one sat on `Master`. Use `raw.githubusercontent.com`, the API, or `git`. CHARTER
+§6.3.
+
+---
+
 Paste this whole file at the start of a new session. It is the single source of
 truth for what this project is, what already exists, what has been proven, and
 what comes next. Nothing described here as existing needs to be rebuilt.
@@ -8,6 +43,24 @@ what comes next. Nothing described here as existing needs to be rebuilt.
 > findings; promote UNVERIFIED → CONFIRMED with evidence. Do **not** delete,
 > reorder, or "clean up." A wrong belief moves to the Corrections table (§13); it
 > does not disappear.
+
+> **Repair note — 2026-08-30. Additive only; nothing was deleted, reordered or
+> rewritten.** Added: the freshness header above (CHARTER §6.2); the GATE-1 note in
+> §3, recording that H3's viability has never been decided; two gotchas in §5 (the
+> stale GitHub blob page, and `triage.sh` already carrying
+> `-fdelayed-template-parsing`); a corrected prompt-file inventory in §6 flagging
+> that `T4_PROMPT.md`, `T5_PROMPT.md` and `D2_PROMPT.md` may not be committed; and
+> **§15, the open-items register** required by the new CHARTER §6.6. No finding,
+> correction, or test row was touched. **§7–§14 are byte-identical to the 2026-08-29
+> version.**
+
+> **Owner decision — 2026-08-30. GATE-1 resolved; H3 removed from the critical
+> path.** Everything achievable without contacting EAC is done first; H3 is a last
+> resort attempted once, with prevention as a terminal result. Reasoning and the
+> bound are in **§3**; the replacement work order is in **§15**. Three new chunks
+> follow from it — **P0** (auth-phase decode), **S0** (redirection feasibility) and
+> **S1a** (the DTLS server) — indexed in `CHUNKS.md`. This changes sequencing only:
+> no finding, correction or test row was altered, and no chunk was marked complete.
 
 > **Repair note — 2026-08-29.** This file was rewritten once to fix accumulated
 > damage. **No finding, correction, or test-log row was deleted.** What changed:
@@ -150,6 +203,34 @@ process and must reach `SSL_read`/`SSL_write` by **signature scan** (static
 OpenSSL, §10, §12A) — T5 changed none of that; it only established that tooling
 proven against the reference can be trusted to transfer.
 
+**Sequencing rule — decided by the owner 2026-08-30, GATE-1 resolved. This is
+standing policy, not a suggestion.**
+
+**Do everything achievable without touching EAC first. H3 is a last resort, run only
+if every other route is exhausted.** The reasoning is not that H3 is off-charter — it
+is not. Hooking `SSL_read` to read plaintext your own client already decrypted is
+reading your own data on your own machine, and §3 forbids *circumventing* an
+integrity system, not being observed by one. Two other things decide it:
+
+1. **Account risk.** Injecting into an EAC-protected process is a well-known ban
+   trigger regardless of intent — EAC detects injection, not motive. The account is
+   load-bearing for everything else: auth captures, world captures, and any future
+   handshake testing against a real server. Spending it early to obtain one of
+   several available plaintext sources is a bad trade. *(Enforcement specifics for
+   New World are not established here — verify before anyone runs H3.)*
+2. **Operating directly in front of a detection system that is watching for exactly
+   this is poor practice** even where it is permitted.
+
+**The bound that keeps this on-charter:** if H3 is ever attempted, it is attempted
+once, plainly. **If EAC prevents the hook, that is a terminal result** — record it
+and stop. Any step whose purpose is to make the hook survive detection is
+circumvention, is off-charter under §3, and does not get pursued, recorded, or built
+on. There is no second attempt with a different technique.
+
+**The consequence that matters: the critical path no longer runs through the retail
+client's process.** Between static extraction, the auth phase, and a server the
+client connects to, most of P-track is reachable without H3. The order is §15.
+
 **T5 also handed S-track three concrete facts** (§12B): the server must run
 GridMate's own 20-byte cookie exchange at the datagram layer, must send a
 HelloRequest once the cookie verifies, and must accept an **empty** client
@@ -243,6 +324,16 @@ dynamic work runs against the client **under Proton** (confirmed below).
   excludes `WinAPI|Windows|Android|Apple|AppleTV|Mac|iOS|Salem|Provo|Jasper` and
   `Tests?/` (line 87). **`build_gridmate.sh`'s 202/41 are authoritative** — they
   built the archives. Don't compare the two tools' raw counts. Test #35.
+- **`triage.sh` already carries `-fdelayed-template-parsing`** — test #34 added it
+  permanently. Test #35's closing line, "left as-is. No code change," refers only
+  to the *file-selection expression*, not the flag. Do not re-add it.
+- **A rendered GitHub blob page can serve a stale file.** On 2026-08-30 a fetch of
+  `github.com/kaatbailey/NWLY/blob/Master/STATE.md` returned the 272-line pre-T4
+  version while the current 1432-line file was on `Master` — and the session
+  concluded from that single result that the work was unpushed and existed on one
+  nvme with no remote. Wrong, and alarming. **Verify repository state with
+  `raw.githubusercontent.com`, the API, or `git log origin/Master` — never the
+  rendered page.** This is now CHARTER §6.3.
 - **Disk:** single 1.9T nvme root (`/dev/nvme0n1p2`), ~591G free as of setup.
 - **Installed tooling:** Ghidra, `tcpdump`, Go, clang 22. **Still to add per
   chunk:** `wireshark-cli` (T3), Frida (H1), pev/radare2 (optional for H2).
@@ -301,7 +392,23 @@ time.**
 **`t1_fingerprint.sh`** / **`t1_evidence.sh`** — the T1 scanners. First gives
 family counts and the verdict; second dumps the verbatim matched strings.
 
-**`T3_PROMPT.md`** — the ready-to-run chunk prompt for T3.
+**Chunk prompt files** — `T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`,
+`D2_PROMPT.md`. Where one of these exists it **is** the prompt; the summary in
+`CHUNKS.md` is an index entry, not a substitute (CHARTER §6.7).
+
+> **VERIFY THIS — flagged 2026-08-30.** As of 2026-08-29 the repository's `Master`
+> branch contained only `.gitattributes`, `CHARTER.md`, `CHUNKS.md` and `STATE.md`.
+> **`T4_PROMPT.md` and `D2_PROMPT.md` were not committed**, despite being cited as
+> ready-to-run; `T5_PROMPT.md` was produced at the end of the T3 session and there
+> is no evidence it was ever committed either. Meanwhile `CHUNKS.md` instructs a
+> session to paste these files. A prompt that lives on one machine cannot be handed
+> to anything, and cannot be recovered if that machine dies. Check and fix:
+>
+> ```fish
+> cd ~/Documents/NWLY; and git ls-files '*_PROMPT.md'
+> ```
+>
+> If any are missing, commit them and delete this notice. CHARTER §6.7.
 
 Each completed chunk's FINDINGS block folds into the relevant section here.
 
@@ -1430,3 +1537,63 @@ result — so no test is silently retried and no result is remembered wrong.
 | 47 | **T5** dump the full ordered handshake sequence with `message_seq`, both sides, to classify the third ClientHello. | Retail three hellos and a HelloRequest; reference two and none — i.e. §12A's renegotiation is retail-specific. | **Falsified — both sides identical: three hellos and a HelloRequest each.** Same types, same order, same `message_seq`. The third hello **resets to seq 0 with no cookie**, so it is the GridMate cookie handoff, not renegotiation. §12A corrected (§13). The HelloRequest is **byte-identical across retail and reference**, all 25 bytes — a GridMate hand-pack, and the single strongest structural-identity result in T5. Only structural difference: which oversized message fragments (retail SKE frames 8–9, ref Certificate frames 9–10), from the 958-vs-1380 cert sizes hitting PMTU. |
 | 48 | **T5 · P4** run `decode_carrier.py` over both epoch-0 flights. | Both parse through the same code path, no special-casing. | **Confirmed.** Retail 16/16 DTLS, 0 Carrier, **0 undecodable**. Reference 57 DTLS + 7 wakeup, 0 Carrier, **0 undecodable**. Same 13-byte `RecordHeader` / 12-byte `HandshakeHeader`, same type sequence. The §12A type-20 CCS gap did not arise (the extracted file stops before CCS) and **remains open**. |
 | 49 | **T5** `openssl s_client -dtls1_2 -connect 127.0.0.1:1` to confirm local 3.6.4 emits ext 65281 rather than SCSV. | Local hello shows 65281 and no SCSV, pinning the RFC 5746 difference on the library. | **Inconclusive, and unnecessary.** Port 1 refused (`write:errno=111`) before any ClientHello was emitted; nothing to inspect. Not retried: the reference capture **is** the 3.6.4 datapoint, and test #43 established GridMate never sets that field, so the bucket holds by construction. Recorded so it is not re-attempted. |
+
+---
+
+## 15. Open items register (CHARTER §6.6)
+
+Every open item has an owning chunk, or is explicitly marked unowned. Added
+2026-08-30. Three kinds: **defects** in our own instruments, **findings** proven and
+not yet used, and **gates** — undecided questions that block a chunk.
+
+An item leaves this table by being resolved with evidence, or by being handed to a
+chunk. It does not leave by being forgotten.
+
+### Gates
+
+| ID | Gate | Blocks | Status |
+| -- | ---- | ------ | ------ |
+| **GATE-1** | **Can H3 run at all?** H3 attaches to the running retail client, which has EAC loaded in-process. | Formerly H3 → P1–P5 → S1–S3, i.e. everything. | **RESOLVED 2026-08-30 by owner decision. The gate is dissolved, not answered** — H3 was removed from the critical path rather than cleared to run. See §3 for the sequencing rule and the table below for the order that replaces it. H3 survives as a **last resort**, attempted once if every other route is exhausted, with EAC prevention as a terminal result. |
+
+### Work order — reachable without touching EAC (established 2026-08-30)
+
+Everything here operates on files we own, on our own reference build, or on a socket
+we answer. None of it contacts a running retail client. In rough dependency order:
+
+| # | Work | Owner chunk | Why it needs no EAC contact |
+| - | ---- | ----------- | --------------------------- |
+| 1 | **Static extraction from `NewWorld.exe`** — dispatch point, handler table, type enum. Scope this **ambitiously**, not just far enough to aim a hook: with H3 off the critical path this is a primary source of protocol structure, not a targeting step. | **H2** | The binary sits on disk. Nothing is running; EAC is not loaded. |
+| 2 | **Protobuf descriptor extraction.** FIND-2: if the embedded `FileDescriptorProto` blobs are real, message schemas come out of the binary with no captured packet at all. Flagged by T1, never extracted. | **P2**, pulled earlier — or folded into H2 | Same: static file inspection. |
+| 3 | **Auth-phase decode.** FIND-1: the TCP/443 flow already decrypts via `SSLKEYLOGFILE`. Contains login, server list, session token, and the world-address handoff. Proven decryptable, **never read**. | **P0** (new) | The client writes the keylog itself. We read a file it produced. Nothing is injected or modified. |
+| 4 | **Redirection feasibility.** Can the client be pointed at a world server we run? The address comes from auth, so this depends on 3. Cheap to test and everything below rests on it. | **S0** (new) | A hosts/DNS change on our own machine. |
+| 5 | **The inversion — build the DTLS server.** T5 specified this layer completely (§12B). When the retail client completes a handshake against our server, **we hold the session keys**, and every message it sends arrives as plaintext on our socket. This is the route that replaces H3 for the client→server half. | **S1a** (new) | We are answering on a port. There is no hook, no injection, and nothing EAC is built to observe. |
+| 6 | **Reference-build hook + signature scan.** Our binary, our symbols, and the last place a signature scan has a free oracle to check against (CHARTER §6.4). | **H1** | The reference build is ours. No retail client involved. |
+| 7 | **Reflection reader decision gate.** T1 and T4 made both sides of the ABI comparison inspectable, so it can be decided on evidence. Independent of everything above. | **H4** | Static. |
+| 8 | **H3 — last resort only.** Gets the server→client half directly. Everything else must be exhausted first, and §3's bound applies: one attempt, prevention is terminal. | **H3** | *(This one does contact EAC. That is why it is last.)* |
+
+**What this order does not give you** is the server→client direction in captured
+form — items 1–7 yield the client's outbound messages plus whatever structure comes
+out of the binary. That half is what S-track has to construct regardless, and H2 +
+FIND-2 are the substitute for observing it.
+
+### Defects in our own instruments
+
+| ID | Defect | Owner | Notes |
+| -- | ------ | ----- | ----- |
+| **DEF-1** | `decode_carrier.py` has **no ChangeCipherSpec (content type 20) branch**. | **Unowned.** | Surfaced test #40 (part of the 19 undecodables), did not arise in test #48 because the extracted flight stops before CCS. Harmless today. CHARTER §4: a tool's cap is part of the measurement — an unhandled type will eventually be read as a finding about the client rather than a gap in the decoder. Small fix; worth doing before H3 output goes through it. |
+
+### Findings proven and not yet used
+
+| ID | Finding | Owner | Notes |
+| -- | ------- | ----- | ----- |
+| **FIND-1** | **The auth phase decrypts today.** `SSLKEYLOGFILE` is honoured by the client's general TLS context: the TCP/443 HTTPS auth/API traffic decrypts with no hook and no H-track dependency (§12A, test #41). The world DTLS stream does **not** — that gap is real and H3 remains required for it. | **Unowned.** | What has been proven is that it *decrypts*. **Nobody has read the contents.** S-track needs this flow eventually: login → server-list → session token → the address and credentials the world connect uses. It is the only part of the protocol readable right now, and it is independent of GATE-1. Candidate for its own chunk. |
+| **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. |
+
+### Unverified, carried forward
+
+- Whether the datasheet `-partN` split is *driven by* the 65535 ceiling (§11).
+  Correlation only. Tested by a future build exceeding it.
+- Whether datasheet **schemas** are stable across builds (§11). Governs how much
+  Track S work a patch invalidates.
+- Epoch ≥ 1 Carrier framing on **retail** is inferred, not proven (§12B). H3's
+  plaintext is what promotes it.
