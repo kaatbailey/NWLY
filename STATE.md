@@ -28,7 +28,8 @@ in this order:
 
 1. **Transport layer** — how the client secures and frames network messages
    (socket path, crypto boundary, packet headers, reliability, reassembly).
-   **In progress.** T1, T2, T4 complete; T3 next, then T5.
+   **In progress.** T1, T2, T3, T4 complete; **T5 next** (both its inputs now in
+   hand — reference §9, retail §12A).
 2. **Protocol layer** — what the messages mean (handshake, dispatch table,
    replica model, wire encoding of the messages a session needs). **Not started**
    — blocked on H3, which is blocked on H1+H2.
@@ -82,9 +83,12 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
   inline hook located by signature — no DLL proxying. §10.
 - **D2 — client game-data extraction.** 2250 datasheets → JSON with localization.
   Track S has its content source. §11.
+- **T3 — retail transport recon.** World connection is **UDP/DTLS 1.2** via
+  `SecureSocketDriver` (settles §7's UNVERIFIED-for-retail). P1–P4 all confirmed;
+  epoch-0 handshake captured for T5. §12A.
 
-**Open, in dependency order:** T3 (retail transport recon) → T5 (the milestone
-diff) → H1, H2 → H3 → P-track → S-track. D1 can start any time.
+**Open, in dependency order:** T5 (the milestone diff) → H1, H2 → H3 → P-track →
+S-track. D1 can start any time. **T3 complete 2026-08-29 (§12A).**
 
 **Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
@@ -100,11 +104,12 @@ claim of "no edits to Amazon's tree." **The build point is `7d4f1ee6`, not
 
 ## 3. What is next, in order
 
-**T3 — Transport recon (retail).** Prompt written: `T3_PROMPT.md`. Wireshark on a
-real login-to-in-world session, no hooks. This is the last input T5 needs, and it
-also settles §7's UNVERIFIED-for-retail question of which secure driver carries
-the world connection (`SecureSocketDriver` / UDP-DTLS vs.
-`StreamSecureSocketDriver` / TCP-TLS).
+**T3 — Transport recon (retail). ✅ COMPLETE 2026-08-29 — findings in §12A.**
+Ran Wireshark/tcpdump on a real login-to-in-world session, no hooks. It was the
+last input T5 needs, and it settled §7's UNVERIFIED-for-retail question: the world
+connection is **`SecureSocketDriver` / UDP-DTLS**, not `StreamSecureSocketDriver` /
+TCP-TLS. P1–P4 all confirmed. The prediction and procedure below are retained as
+written; the result is §12A.
 
 Two procedural details decide whether it succeeds:
 
@@ -121,9 +126,11 @@ match is close to conclusive for a stock-ish GridMate transport. A normal
 multi-suite list means Amazon replaced the `SSL_CTX` setup, and T5's verdict needs
 qualifying even though T1 said GridMate.
 
-**Then T5 — reference vs retail handshake diff.** The chunk that answers the
-charter's core question. Both inputs will be in hand: the reference epoch-0
-handshake from T4 (§9) and the retail epoch-0 handshake from T3.
+**T5 — reference vs retail handshake diff (now the active step).** The chunk that
+answers the charter's core question. **Both inputs are now in hand:** the reference
+epoch-0 handshake from T4 (§9) and the retail epoch-0 handshake from T3
+(`t3_handshake_epoch0.pcap`, §12A). P4 already confirmed a single-suite `0xC030`
+match, so the structural-match verdict is not pre-qualified going in.
 
 **Then Track H opens.** H2 (locate the dispatch point in retail, static Ghidra)
 can in fact start now — it needs no login and no running client. It is the
@@ -185,6 +192,8 @@ dynamic work runs against the client **under Proton** (confirmed below).
 | Client runtime              | **Proton.** `steamapps/compatdata/1063730` exists, so the retail client is a PE process under Wine on this host. Neutral for T3 (traffic exits `enp2s0` normally); a real complication for H1/H3, since Frida attaching inside Wine is a different problem from attaching natively. |
 | Capture interface           | **`enp2s0`**, host `192.168.1.33`, gateway `192.168.1.1`. Not `-i any` — that yields Linux-cooked (SLL) framing; `enp2s0` keeps retail captures on `DLT_EN10MB`, matching the T4 loopback captures so `decode_carrier.py` sees the same link layer. |
 | Capture output              | Retail: `~/Documents/nwly-captures/` (outside the repo). Reference: `build/*.pcap` (gitignored except `!build/*.pcap`). |
+| Retail launch (confirmed T3) | Launches under **GE-Proton** (2026-08-29). `NewWorld.exe` runs as a PE under `wineserver` (seen in T3 `ss -tunp`), confirming the "Client runtime: Proton" row above by actual launch, not just a `compatdata` prefix. **"Steam Linux Runtime 1.0" is not Proton** — forcing it exits the game to the library instantly. An earlier Proton-Experimental attempt bounced the same way; cause not cleanly isolated (possibly the runtime misconfig), so recorded only as "GE-Proton is the known-good config," not "Experimental fails." **Implication for H1/H3:** Frida attaches to a Wine process — plan Frida-under-Wine, not native attach. |
+| Retail captures (T3)        | `~/Documents/nwly-captures/t3_retail_b22469132_20260829-203901.pcap` (good — handshake inside), `t3_handshake_epoch0.pcap` (**T5's retail input**), `t3_sizes.tsv` (still/walk profile). Game flow `192.168.1.33:27001 ↔ 52.223.16.88:54888` (AWS). §12A. |
 | EasyAntiCheat location      | `<install>/EasyAntiCheat/` — `EasyAntiCheat_EOS_Setup.exe`, `EOSSDK-Win32-Shipping.dll`, `EOSSDK-Win64-Shipping.dll`. **A sibling of `Bin64/`, not inside it.** §10's mention could be read as implying `Bin64/`; a scan of `Bin64/` alone would wrongly conclude EAC is absent. Location recorded only. CHARTER §3 — not touched, not analysed. |
 | Lumberyard fork (reference) | `~/Documents/lumberyard` (github.com/kaatbailey/lumberyard, fork of aws/lumberyard, branch `master`). GridMate at `dev/Code/Framework/GridMate/`, AzCore at `dev/Code/Framework/AzCore/`. |
 | Fork commit — **read** from   | `413ecaf24d7a534801cac64f50272fe3191d278f`. Every §7 source-reading fact was established against this tree. **This is not the tree that builds.** |
@@ -309,7 +318,10 @@ record header), `DTLS1_HM_HEADER_LENGTH` (12-byte handshake header),
 - There are **two** secure drivers: `SecureSocketDriver` (datagram/DTLS) and
   `StreamSecureSocketDriver` (stream/TLS). Which one the retail MMO uses for its
   main connection is a specific T3/T5 question — persistent-world traffic could
-  lean either way. **UNVERIFIED for retail.**
+  lean either way. ~~**UNVERIFIED for retail.**~~ **CONFIRMED for retail
+  2026-08-29 (T3, §12A): `SecureSocketDriver` (UDP/DTLS).** The world connection
+  is UDP carrying DTLS 1.2 records (`0xfefd`); the stream/TLS driver is not used
+  for it. This fixes the shape of every P-track chunk. Evidence in §12A.
 
 ### GridMate's dependency surface is clean
 
@@ -662,8 +674,11 @@ retail.
 
 **Client build under test:** `NewWorld.exe`, 171 MB, Steam install, unpacked,
 buildid 22469132. OpenSSL version string `OpenSSL 1.1.1k  25 Mar 2021`. (Exact
-game version string from the launcher still not recorded — worth pulling before
-T5.)
+game version string from the launcher still not recorded. **T3 (2026-08-29)
+attempted this and it was not surfaced in-client** — no version shown on the
+launcher/title/menu this session. `buildid 22469132` / `LastUpdated 1787844457`
+remain the only build identifiers; treat this as attempted-not-available, not a
+standing task. §12A.)
 
 **Status:** T1 complete. T2 complete except its anti-cheat non-goal — crypto
 library, boundary function and linkage are all answered below.
@@ -908,6 +923,129 @@ repair. Renumbered, not rewritten.)*
 
 ---
 
+## 12A. Retail transport — CONFIRMED (T3, capture-only, no hooks)
+
+Folded from FINDINGS — T3 — 2026-08-29. Wireshark/tcpdump on a real
+login-to-in-world session; no hooks, no injection, no decryption of epoch ≥ 1
+(CHARTER §3 satisfied). **Build under test:** New World: Aeternum, appid 1063730,
+**buildid 22469132**, `LastUpdated 1787844457` (2026-08-27). Voice (Vivox)
+disabled at source before capturing, per §10.
+
+### Transport, named
+
+The persistent-world connection is **UDP carrying DTLS 1.2**, so retail uses
+GridMate **`SecureSocketDriver`**, not `StreamSecureSocketDriver`. This promotes
+§7's UNVERIFIED-for-retail note to CONFIRMED and fixes the shape of every P-track
+chunk.
+
+- Game stream: local `192.168.1.33:27001` ↔ server **`52.223.16.88:54888`** (AWS).
+  Sustained bidirectional, ~8,600 UDP frames across the in-world window. It is the
+  UDP conversation with two-way traffic across the whole session — **not** the
+  largest by bytes. Same IP:port on both of the day's captures.
+- Auth / server-list is a **separate TCP/443 HTTPS phase** to AWS
+  (`44.220.67.249` ×3, `13.217.79.62`, `18.238.35.71`), TLS 1.2, cipher `0xC02F`.
+  Cloudflare 443 (`104.18.124.108`, `162.159.*`) is CDN/API, not the game server.
+- **Attribution rule for next time:** find the game flow by the sustained two-way
+  UDP shape to an AWS host, cross-checked against `ss -tunp` showing it under
+  `NewWorld.exe`/`wineserver` — never by byte volume (a Steam/CDN transfer can be
+  larger). Local port is ephemeral and will change per session; do not hardcode
+  `27001`.
+
+### Predictions P1–P4 — all confirmed
+
+| # | Prediction | Result |
+| - | ---------- | ------ |
+| **P1** | World is UDP; auth/server-list a separate TCP/443 HTTPS phase | **CONFIRMED.** UDP game stream + distinct TCP/443 HTTPS cluster to AWS, per the `conv,udp`/`conv,tcp` tables above. |
+| **P2** | UDP payloads parse as DTLS 1.2; `decode_carrier.py` recognises them unmodified | **CONFIRMED.** All game-flow records parse as DTLS 1.2 (`0xfefd`) once the dissector is forced with `-d udp.port==…,dtls`. `decode_carrier.py` decoded retail **unmodified**: 8618/8637 datagrams as DTLS, 0 Carrier. The predicted loopback/offset bug did not occur (both loopback and `enp2s0` are `DLT_EN10MB`). |
+| **P3** | ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) → ClientHello with cookie echoed | **CONFIRMED.** Frames 241 (ClientHello, `0xfefd`, no cookie) → 242 (HelloVerifyRequest, `0xfeff`) → 243 (ClientHello, `0xfefd`, cookie echoed). Cookie **`eb14bc1b7aaadacffb30cd3334bc814690591056`** appears on 242 and is echoed verbatim on 243. `SSL_CTX_set_cookie_generate_cb` not disabled. HVR at DTLS 1.0 is correct (RFC 6347 §4.2.1), as §9 predicted. |
+| **P4** *(load-bearing)* | ClientHello advertises exactly one suite, `0xC030` | **CONFIRMED.** Cipher list is `0xC030,0x00FF` — **one real suite** (ECDHE-RSA-AES256-GCM-SHA384) plus `0x00FF`, the TLS renegotiation-info **SCSV** (a signalling pseudo-suite, not a cipher). Matches the reference hardcode at `SecureSocketDriver.cpp:1494`. **T5's structural-match verdict stands unqualified — retail is stock-ish GridMate transport.** |
+
+### Additional handshake observations (P-track relevant, not acted on in T3)
+
+- **Early renegotiation.** The server sends a **HelloRequest** (`decode_carrier.py`
+  datagram #5), which triggers a *fourth* handshake message — a third ClientHello
+  at frame 245. So the extra ClientHello is renegotiation, not a retransmit. Note
+  for T5/P-track epoch reasoning.
+- **Mutual auth.** The server sends a **CertificateRequest** (handshake type 13) —
+  it asks the client for a certificate. Relevant to the eventual **server layer**:
+  a private server will have to satisfy whatever client-cert behaviour this
+  implies. Recorded, not pursued.
+- **ChangeCipherSpec accounting.** CCS is content type **20** (frames 254, 257).
+  `decode_carrier.py` has **no type-20 branch**, so those two records plus a few
+  Brave/QUIC strays on `:50229` are the "19 undecodable" datagrams (of 8637).
+  Harmless; add a CCS branch for completeness so the next session doesn't
+  re-investigate.
+- Full handshake flight is present in the capture (ServerHello, Certificate,
+  ServerKeyExchange, ServerHelloDone, ClientKeyExchange, NewSessionTicket), i.e.
+  the epoch-0 exchange T5 needs is complete, not just the opening bytes.
+
+### Capture procedure that worked (so it isn't rediscovered)
+
+- **Start `tcpdump` while the game is fully quit, then launch.** The world socket
+  opens *earlier than "enter world"* — during character creation / cut-scenes.
+  The first retail capture started tcpdump after the socket was already open
+  (`conv,udp` `Start 0.000000`) and caught only epoch-1 ciphertext (test #36). The
+  good capture started tcpdump first; the game flow appears at `t≈18.6s`, so the
+  handshake is inside the file (test #37).
+- **A full quit + relaunch forces a fresh full handshake** (no session to resume).
+  A brand-new character guarantees the first-time world-load path. `set -g PCAP
+  (command ls -t …)` — `command ls` bypasses Garuda's `ls`→`eza` alias, which
+  otherwise eats `-t` as `--time`.
+
+### Version string
+
+**Not surfaced in-client this session.** No human-readable version on the
+launcher/title/menu. `buildid 22469132` / `LastUpdated 1787844457` remain the only
+build identifiers. Closes §10's "pull before T5" as attempted-not-available.
+
+### Noticed, out of scope — H-track recon (recorded, NOT built on — CHARTER §3)
+
+**`SSLKEYLOGFILE` is honoured for the TLS/HTTPS stack, NOT for the DTLS world
+stream.** This is the cheap-plaintext question the H-track cares about, and it
+splits cleanly:
+
+- Launched via Steam option `SSLKEYLOGFILE=/home/kaatlev/nwly-keylog.txt
+  %command%`. File **written**, 178 lines — 158 `CLIENT_RANDOM` (TLS/DTLS 1.2) and
+  the TLS 1.3 `*_TRAFFIC_SECRET_0` / `*_HANDSHAKE_TRAFFIC_SECRET` / `EXPORTER_SECRET`
+  sets. So the keylog **callback is compiled into the shipped OpenSSL** — the thing
+  §10 left open.
+- **Auth phase DECRYPTS.** On the TCP/443 flows, Wireshark's `tls.debug` shows
+  `ssl_add_record_info stored decrypted record` / `dissect_ssl_payload decrypted`.
+- **World stream does NOT decrypt.** The world ClientHello's client random
+  (`0674c28f00c23264ba91029310653b3d6a1d0e2d591b31319d1a5f54df5aa976`) is **absent**
+  from the keylog file, and `tls.debug` reports `no decoder available` for every
+  UDP/27001 record. (An incrementing byte run in the payload looked like decrypted
+  framing but was the **AES-GCM explicit-nonce counter** — visible by design in
+  ciphertext. The `tls.debug` decrypt log is the falsifiable check; it returned
+  zero decrypts for the world flow.)
+- **Interpretation:** the keylog callback is wired into the general TLS/HTTPS
+  `SSL_CTX` but **not** into the GridMate `SecureSocketDriver` DTLS `SSL_CTX`
+  (separate context setup — the two paths are built by different code).
+- **Consequence: H3's signature-scan inline hook on `SSL_read`/`SSL_write` is
+  STILL REQUIRED for the world stream — keylog does not replace it.** It does give
+  the auth/API phase in plaintext for free if the H-track ever needs
+  login/session-token traffic. Whether the DTLS context *could* be made to log
+  (forcing the callback) is an interception/mod question, H-track, not T3.
+- Static OpenSSL (§10): `SSL_read`/`SSL_write` have no export; H3 reaches them by
+  signature scan; plaintext is on the stack the instant they return. Unchanged.
+- **Session-resumption note:** the server issues a `NewSessionTicket` and
+  renegotiates early, so a reconnect may resume rather than do a full epoch-0
+  exchange — the reason the good capture used a full quit + fresh character.
+
+**EAC/EOS in the capture:** endpoints were identified only so they could be
+excluded from the game-stream analysis. Not characterised, not recorded beyond
+"not the game stream" (CHARTER §3).
+
+### What this unblocks
+
+- **T5 now has both inputs:** the reference epoch-0 handshake (§9) and the retail
+  epoch-0 handshake (`t3_handshake_epoch0.pcap`). P4's single-suite match means
+  the structural-match verdict is **not** pre-qualified.
+- The secure-driver question (§7) is settled: `SecureSocketDriver` / UDP-DTLS.
+- H1/H3 setup targets a **Proton/Wine** process (GE-Proton confirmed, §5).
+
+---
+
 ## 13. Corrections — beliefs that turned out wrong
 
 Acting on any of these wastes real time. Every session that overturns a prior
@@ -929,6 +1067,7 @@ claim adds a row here rather than deleting the claim.
 | "Oodle (ZIP method 15) needs the MSVC redistributable, so Linux extraction is Proton-or-nothing." — inferred from the tool README listing MSVC as a dependency. | **WRONG.** `go-oodle-lz` + `ebitengine/purego` `dlopen` a **native** Oodle v2.9.13 fetched at first run. No wine, no PE DLL, no cgo. Built and extracted clean on Garuda. Cause of the error: read a dependency note written for the Windows release binaries and assumed it described the source. |
 | "645 datasheets extracted in 173ms is suspiciously fast — likely a silent failure." — raised in session. | **WRONG.** Output verified column-by-column: `MasterItemDefinitions_Faction`, 127 columns × 4121 rows, legible headers. Oodle is simply that fast. Worth the check regardless — it is the D2 prompt's named failure mode — but speed alone was not evidence of anything. |
 | "EAC ships as `EOSSDK-Win64/Win32-Shipping.dll`" — §10, written in a way that reads as implying `Bin64/`. | **IMPRECISE, and misleading in one specific way.** The EAC files live in `<install>/EasyAntiCheat/`, a **sibling** of `Bin64/`. A session scanning `Bin64/` alone would wrongly conclude EAC is absent. Corrected location is in §5. Charter §3 unchanged — location only. |
+| "`SSLKEYLOGFILE` is honoured, so the client's decrypted stream is readable from a file with no hook — H1/H3 may be unnecessary." — raised in session (T3, 2026-08-29) on finding the keylog file populated (178 lines) and an incrementing byte pattern in the payload. | **WRONG for the world stream; true only for auth.** The keylog decrypts the TLS 1.2 HTTPS auth phase but **not** the DTLS world stream: the world ClientHello's client random (`0674c28f…5aa976`) is absent from the file and Wireshark reports `no decoder available` for every UDP/27001 record, while the TCP/443 flows show `dissect_ssl_payload decrypted`. The callback is wired into the general TLS `SSL_CTX`, not the GridMate `SecureSocketDriver` DTLS context. **H3's signature-scan hook on `SSL_read`/`SSL_write` is still required.** Cause of the error: a populated keylog file plus an incrementing payload run (actually the AES-GCM explicit-nonce counter, visible by design in ciphertext) were read as success *before* running the falsifiable check — the `tls.debug` decrypt log, which returned zero decrypts for the world flow. §12A. |
 
 ---
 
@@ -974,3 +1113,9 @@ result — so no test is silently retried and no result is remembered wrong.
 | 33 | Run `triage.sh` (which carries no `-fdelayed-template-parsing`) over AzCore, as a full-build version of #32. | 168/202, matching test #10 — i.e. the flag is redundant. | **Falsified, badly.** 60/191, with **108** `no member named X in X` failures. Two variables differed from #10 at once (flag absent *and* a different file set — 191 vs 202, `triage.sh` includes Android TUs that `build_gridmate.sh` excludes), so this run alone proved nothing. Reading the actual error text is what settled it. |
 | 34 | Add `-fdelayed-template-parsing` to `triage.sh` and re-run AzCore — change exactly one thing from #33. | The 108 `no member named` failures vanish; ~40 `file not found` remain. | **Confirmed exactly.** **151/191**, all 108 gone, remaining 40 are `file not found` only (jni.h, rapidjson, Lua, rapidxml). Root cause identified from the error text: `std/containers/queue.h:202` spells `rhs.m_continer` instead of `m_container` — one typo in an uninstantiated template body, invisible under delayed parsing, fatal without it. The flag is load-bearing. §7, §13. |
 | 35 | `triage.sh` enumerates 191 AzCore and 36 GridMate TUs; `build_gridmate.sh` enumerated 202 and 41 (tests #10, #11), and `triage.sh` picks up Android TUs (`APKFileHandler.cpp`, needs `jni.h`) that the recorded run excluded. Diff the two file-selection expressions. | The scripts' `find` predicates differ in platform exclusions; `build_gridmate.sh` is the one whose counts the archives were built from. | **Confirmed, prediction held.** `build_gridmate.sh:87` filters `EXCLUDE='/(WinAPI\|Windows\|Android\|Apple\|AppleTV\|Mac\|iOS\|Salem\|Provo\|Jasper)/\|/Tests?/'` through `grep -Ev`; `triage.sh:26,29` does a bare `find` on `AzCore` + `Platform/Linux` with no exclusion, so it walks `Android/` and inflates the failure count with `jni.h` misses. **`build_gridmate.sh`'s 202/41 are authoritative** — they are what produced `libazcore.a`/`libgridmate.a`. `triage.sh` is a triage tool; its wider net doesn't change error-kind grouping, so it is left as-is. No code change. |
+| 36 | **T3** first retail capture: start `tcpdump`, reach in-world, then search the game flow for epoch-0 handshake (type-22) records. | Handshake present. | **Falsified — timing.** Game UDP flow `27001↔52.223.16.88:54888` had `conv,udp` `Start 0.000000` — the world socket was already open when tcpdump began. 0 type-22 records; all epoch-1 ApplicationData. The socket opens earlier than "enter world" (during creation/cut-scenes). Capture discarded, not analysed. |
+| 37 | **T3** second retail capture: fresh character, `tcpdump` started **before** launch; search for DTLS handshake records. | Handshake now inside the file. | **Confirmed.** Game flow `Start 18.575s` (socket opened after capture began). Type-22 sequence present: ClientHello(1)/HelloVerifyRequest(3)/ClientHello(1) at frames 241/242/243, full flight through Finished. `t3_retail_b22469132_20260829-203901.pcap`; epoch-0 extracted to `t3_handshake_epoch0.pcap`. §12A. |
+| 38 | **T3 · P4** count cipher suites on the retail ClientHello. | Exactly one, `0xC030`. | **Confirmed.** `0xC030,0x00FF` — one real suite (ECDHE-RSA-AES256-GCM-SHA384) plus `0x00FF`, the renegotiation-info **SCSV** (not a cipher). Matches reference hardcode `SecureSocketDriver.cpp:1494`. T5 structural-match stands unqualified. |
+| 39 | **T3 · P3** is the DTLS cookie echoed verbatim? | ClientHello → HVR(`0xfeff`) → ClientHello with the same cookie. | **Confirmed.** Cookie `eb14bc1b7aaadacffb30cd3334bc814690591056` on the HelloVerifyRequest (frame 242, `0xfeff`) and echoed on the retry ClientHello (frame 243, `0xfefd`); first ClientHello (241) carries none. |
+| 40 | **T3 · P2** run `decode_carrier.py` against the retail capture; predict a loopback/offset break. | Ethernet-vs-loopback offset or a `127.0.0.1` filter breaks it. | **Falsified (no break).** Decoder ran unmodified: 8618/8637 datagrams as DTLS 1.2, 0 Carrier. Both loopback and `enp2s0` are `DLT_EN10MB`, so no offset issue. 19 undecodable = ChangeCipherSpec (content type 20, no decoder branch) + Brave/QUIC strays on `:50229`. Also surfaced: server HelloRequest (early renegotiation) and CertificateRequest (type 13, mutual auth). §12A. |
+| 41 | **T3 · H-track** launch once with `SSLKEYLOGFILE` set; does the client honour it? | Negative — the keylog callback is usually stripped from a shipped OpenSSL. | **Split result.** File **written**, 178 lines. **Auth/HTTPS DECRYPTS** (TCP/443; `tls.debug` `dissect_ssl_payload decrypted`). **World DTLS does NOT**: world ClientHello random `0674c28f…5aa976` absent from keylog; `tls.debug` `no decoder available` for every UDP/27001 record. Callback wired into the general TLS context, not the GridMate DTLS `SSL_CTX`. **H3 signature-scan hook still required** for the world stream; keylog gets the auth phase free. §12A, §13. |
