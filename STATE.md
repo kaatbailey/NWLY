@@ -28,8 +28,11 @@ in this order:
 
 1. **Transport layer** — how the client secures and frames network messages
    (socket path, crypto boundary, packet headers, reliability, reassembly).
-   **In progress.** T1, T2, T3, T4 complete; **T5 next** (both its inputs now in
-   hand — reference §9, retail §12A).
+   **T-track complete.** T1, T2, T3, T4, T5 all done. **T5 (§12B) answered
+   CHARTER §2's core question: retail transport is stock GridMate
+   `SecureSocketDriver`, and the reference build is a valid instrument for it.**
+   What remains in this layer is H-track (H1/H2 → H3), which supplies the
+   epoch-≥1 plaintext.
 2. **Protocol layer** — what the messages mean (handshake, dispatch table,
    replica model, wire encoding of the messages a session needs). **Not started**
    — blocked on H3, which is blocked on H1+H2.
@@ -86,9 +89,17 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
 - **T3 — retail transport recon.** World connection is **UDP/DTLS 1.2** via
   `SecureSocketDriver` (settles §7's UNVERIFIED-for-retail). P1–P4 all confirmed;
   epoch-0 handshake captured for T5. §12A.
+- **T5 — reference vs retail handshake diff. THE MILESTONE.** Retail transport is
+  **structurally stock GridMate `SecureSocketDriver` with zero catalogued
+  exceptions**; every difference from the reference is OpenSSL 1.1.1k-vs-3.6.4
+  noise in fields the source does not set. **Mutual auth is stock, not
+  Amazon-added.** **The reference build is a valid instrument for retail's
+  transport.** P1–P4 all confirmed. Offline: two pcaps + source, no client launch,
+  no hooks, no decryption. §12B.
 
-**Open, in dependency order:** T5 (the milestone diff) → H1, H2 → H3 → P-track →
-S-track. D1 can start any time. **T3 complete 2026-08-29 (§12A).**
+**Open, in dependency order:** H1, H2 → H3 → P-track → S-track. D1 can start any
+time. **T3 complete 2026-08-29 (§12A). T5 complete 2026-08-29 (§12B) — the
+T-track is finished and H-track is now the active front.**
 
 **Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
@@ -126,15 +137,23 @@ match is close to conclusive for a stock-ish GridMate transport. A normal
 multi-suite list means Amazon replaced the `SSL_CTX` setup, and T5's verdict needs
 qualifying even though T1 said GridMate.
 
-**T5 — reference vs retail handshake diff (now the active step).** The chunk that
-answers the charter's core question. **Both inputs are now in hand:** the reference
-epoch-0 handshake from T4 (§9) and the retail epoch-0 handshake from T3
-(`t3_handshake_epoch0.pcap`, §12A). P4 already confirmed a single-suite `0xC030`
-match, so the structural-match verdict is not pre-qualified going in.
+**T5 — reference vs retail handshake diff. ✅ COMPLETE 2026-08-29 — findings in
+§12B.** The chunk that answers the charter's core question, and it answered it:
+stock GridMate, zero exceptions, reference validated as an instrument. Both inputs
+were in hand (reference §9, retail §12A) and the reference capture did not need
+regenerating (test #42). The framing below is retained as written; the result is
+§12B.
 
-**Then Track H opens.** H2 (locate the dispatch point in retail, static Ghidra)
-can in fact start now — it needs no login and no running client. It is the
-fallback if T3 stalls for lack of a usable account or live servers.
+**Track H is now the active front.** H2 (locate the dispatch point in retail,
+static Ghidra) needs no login and no running client. H1/H3 target a **Proton/Wine**
+process and must reach `SSL_read`/`SSL_write` by **signature scan** (static
+OpenSSL, §10, §12A) — T5 changed none of that; it only established that tooling
+proven against the reference can be trusted to transfer.
+
+**T5 also handed S-track three concrete facts** (§12B): the server must run
+GridMate's own 20-byte cookie exchange at the datagram layer, must send a
+HelloRequest once the cookie verifies, and must accept an **empty** client
+Certificate. There is no client-cert PKI to reverse.
 
 **D1 (signature-scan harness)** has a free head start: the `Bin64.sha256` baseline
 in §5 already answers "which binaries did this patch touch."
@@ -314,7 +333,11 @@ record header), `DTLS1_HM_HEADER_LENGTH` (12-byte handshake header),
   don't reverse them. Confirmed on the wire in §9.
 - **A single cipher suite is hardcoded** at `SecureSocketDriver.cpp:1494`:
   `ECDHE-RSA-AES256-GCM-SHA384` (`0xC030`). This is T3/T5's sharpest falsifiable
-  prediction — see §3.
+  prediction — see §3. **CONFIRMED on both wires (T3 §12A, T5 §12B).**
+- **The full list of fields this file explicitly sets is enumerated in §12B**
+  (T5, from source). Anything absent from that list is an OpenSSL default. That
+  list is what makes a retail-vs-reference diff falsifiable rather than
+  impressionistic — build on it rather than re-deriving it.
 - There are **two** secure drivers: `SecureSocketDriver` (datagram/DTLS) and
   `StreamSecureSocketDriver` (stream/TLS). Which one the retail MMO uses for its
   main connection is a specific T3/T5 question — persistent-world traffic could
@@ -648,7 +671,16 @@ client -> server   ClientHello          DTLS1.2  epoch=0   (cookie echoed)
 (`fe fd`), and that is correct.** RFC 6347 §4.2.1: the server is stateless at
 that point and has not negotiated a version, so HVR goes out at 1.0. **This is
 not a bug and not a downgrade.** Expect to see it in retail captures too; do not
-spend time chasing it.
+spend time chasing it. *(Confirmed in retail, T3 §12A.)*
+
+> **REFINED by T5 (§12B, §13) — not wrong, but incomplete, and the real mechanism
+> is more useful.** The RFC permits it, but the actual cause is that GridMate
+> **hardcodes** `RecordHeader::m_version = DTLS1_VERSION` (`0xFEFF`) in its
+> hand-packed records (`SecureSocketDriver.cpp:308`, `:312`, `:343`). That moves
+> the `fe ff` from "library/RFC default" into the **GridMate-controlled** bucket,
+> where it matches retail exactly. **Diagnostic value: every `fe ff` record in a
+> capture is a GridMate hand-pack — exactly two per handshake
+> (HelloVerifyRequest, HelloRequest).** The advice not to chase it stands.
 
 The cookie is plainly visible and echoed verbatim. Observed:
 
@@ -667,6 +699,10 @@ without session keys, which makes it the only part usable for diffing against
 retail.
 
 **This capture is T5's reference input.** The retail counterpart comes from T3.
+**Used unmodified in T5 — it already contained epoch 0 (16 type-22 records), so it
+was not regenerated (test #42).** Verify content, not just file existence, before
+trusting any future reference capture: test #18's `--secure` capture was 30/30
+epoch-1 with no handshake in it at all.
 
 ---
 
@@ -957,19 +993,30 @@ chunk.
 | - | ---------- | ------ |
 | **P1** | World is UDP; auth/server-list a separate TCP/443 HTTPS phase | **CONFIRMED.** UDP game stream + distinct TCP/443 HTTPS cluster to AWS, per the `conv,udp`/`conv,tcp` tables above. |
 | **P2** | UDP payloads parse as DTLS 1.2; `decode_carrier.py` recognises them unmodified | **CONFIRMED.** All game-flow records parse as DTLS 1.2 (`0xfefd`) once the dissector is forced with `-d udp.port==…,dtls`. `decode_carrier.py` decoded retail **unmodified**: 8618/8637 datagrams as DTLS, 0 Carrier. The predicted loopback/offset bug did not occur (both loopback and `enp2s0` are `DLT_EN10MB`). |
-| **P3** | ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) → ClientHello with cookie echoed | **CONFIRMED.** Frames 241 (ClientHello, `0xfefd`, no cookie) → 242 (HelloVerifyRequest, `0xfeff`) → 243 (ClientHello, `0xfefd`, cookie echoed). Cookie **`eb14bc1b7aaadacffb30cd3334bc814690591056`** appears on 242 and is echoed verbatim on 243. `SSL_CTX_set_cookie_generate_cb` not disabled. HVR at DTLS 1.0 is correct (RFC 6347 §4.2.1), as §9 predicted. |
+| **P3** | ClientHello (`fe fd`) → HelloVerifyRequest (`fe ff`) → ClientHello with cookie echoed | **CONFIRMED.** Frames 241 (ClientHello, `0xfefd`, no cookie) → 242 (HelloVerifyRequest, `0xfeff`) → 243 (ClientHello, `0xfefd`, cookie echoed). Cookie **`eb14bc1b7aaadacffb30cd3334bc814690591056`** appears on 242 and is echoed verbatim on 243. ~~`SSL_CTX_set_cookie_generate_cb` not disabled.~~ **WRONG — corrected by T5: GridMate never used OpenSSL's cookie callbacks at all (0 hits tree-wide); the cookie is its own `GenerateCookie`/`VerifyCookie`, run before OpenSSL sees the datagram. See §12B and §13.** HVR at DTLS 1.0 is correct (RFC 6347 §4.2.1), as §9 predicted. |
 | **P4** *(load-bearing)* | ClientHello advertises exactly one suite, `0xC030` | **CONFIRMED.** Cipher list is `0xC030,0x00FF` — **one real suite** (ECDHE-RSA-AES256-GCM-SHA384) plus `0x00FF`, the TLS renegotiation-info **SCSV** (a signalling pseudo-suite, not a cipher). Matches the reference hardcode at `SecureSocketDriver.cpp:1494`. **T5's structural-match verdict stands unqualified — retail is stock-ish GridMate transport.** |
 
 ### Additional handshake observations (P-track relevant, not acted on in T3)
 
-- **Early renegotiation.** The server sends a **HelloRequest** (`decode_carrier.py`
-  datagram #5), which triggers a *fourth* handshake message — a third ClientHello
-  at frame 245. So the extra ClientHello is renegotiation, not a retransmit. Note
-  for T5/P-track epoch reasoning.
+- **~~Early renegotiation.~~** The server sends a **HelloRequest**
+  (`decode_carrier.py` datagram #5), which triggers a *fourth* handshake message —
+  a third ClientHello at frame 245. So the extra ClientHello is renegotiation, not
+  a retransmit. Note for T5/P-track epoch reasoning.
+  **SUPERSEDED by T5 (§12B, §13). The observation is right; "renegotiation" is
+  wrong.** It is stock GridMate's **cookie handoff** — the reference build does
+  exactly the same thing with no Amazon involvement. `message_seq` **resets to 0**
+  on that third ClientHello and it carries **no cookie**; renegotiation would
+  follow a completed handshake, not precede one. Mechanism is the
+  `CS_SEND_HELLO_REQUEST` server state. **This is a hard S-track requirement** —
+  see §12B.
 - **Mutual auth.** The server sends a **CertificateRequest** (handshake type 13) —
   it asks the client for a certificate. Relevant to the eventual **server layer**:
   a private server will have to satisfy whatever client-cert behaviour this
   implies. Recorded, not pursued.
+  **RESOLVED by T5 (§12B): stock GridMate, not Amazon-added**, and **the client
+  answers with an empty Certificate (length 0)** on both retail and reference. So
+  the server-layer obligation is small: send the request, accept nothing back.
+  There is no client-cert PKI and no embedded cert to find in `NewWorld.exe`.
 - **ChangeCipherSpec accounting.** CCS is content type **20** (frames 254, 257).
   `decode_carrier.py` has **no type-20 branch**, so those two records plus a few
   Brave/QUIC strays on `:50229` are the "19 undecodable" datagrams (of 8637).
@@ -1046,6 +1093,258 @@ excluded from the game-stream analysis. Not characterised, not recorded beyond
 
 ---
 
+## 12B. Retail transport verdict — CONFIRMED (T5, offline diff, no hooks)
+
+Folded from FINDINGS — T5 — 2026-08-29. **This is the section that licenses the
+rest of the project.** Two pcaps and one source file; no client launch, no hooks,
+no injection, no decryption of epoch ≥ 1 (CHARTER §3 satisfied).
+
+**Build under test:** New World: Aeternum, appid 1063730, **buildid 22469132**,
+`LastUpdated 1787844457`.
+**Retail input:** `~/Documents/nwly-captures/t3_handshake_epoch0.pcap` (extracted
+in T3 from `t3_retail_b22469132_20260829-203901.pcap`).
+**Reference input:** `~/Documents/NWLY/build/carrier_dtls.pcap`, from fork commit
+**`7d4f1ee6`**, OpenSSL 3.6.4, clang 22. **Not regenerated** — it already contained
+epoch 0 (test #42).
+
+### The verdict
+
+> Retail transport is **structurally stock GridMate `SecureSocketDriver`**, with
+> **zero catalogued exceptions**. Every handshake difference between retail
+> (buildid 22469132) and the reference (`7d4f1ee6`) is attributable to **OpenSSL
+> 1.1.1k vs 3.6.4** defaults in fields `SecureSocketDriver.cpp` does not set.
+> **Mutual auth is stock GridMate, not Amazon-added.** **The reference build is a
+> valid instrument for retail's transport**, within the caveats below.
+
+CHARTER §2's core question — fork or rewrite — is answered. The reference build has
+done the job it was built for.
+
+### The GridMate-controlled field list (established from source *before* diffing)
+
+Read from `SecureSocketDriver.cpp`. Anything **not** on this list is an OpenSSL
+default and is noise by construction — the bucket was assigned before the bytes
+were looked at (CHARTER §4).
+
+| Field | Source | Retail | Reference | Match |
+| ----- | ------ | ------ | --------- | ----- |
+| Cipher suite | `:1494` `SSL_CTX_set_cipher_list("ECDHE-RSA-AES256-GCM-SHA384")` | `0xC030`, one real suite | `0xC030`, one real suite | **YES** |
+| Protocol version | `:1472` `SSL_CTX_new(DTLSv1_2_method())` — pinned, not `DTLS_method()` | `0xfefd` | `0xfefd` | **YES** |
+| MTU option | `:1479` `SSL_OP_NO_QUERY_MTU` (the only option set) | n/a on wire | n/a on wire | — |
+| Peer verification | `:1522`–`:1553` | CertReq (13) from server | CertReq (13) from server | **YES** |
+| Cookie mechanism | `:1699` `GenerateCookie` / `:1737` `VerifyCookie` — GridMate's own | 20 bytes, echoed verbatim | 20 bytes, echoed verbatim | **YES** |
+| Hand-packed record version | `:308`, `:312`, `:343` `RecordHeader::m_version = DTLS1_VERSION` (`0xFEFF`) | `fe ff` on HVR + HelloRequest | `fe ff` on HVR + HelloRequest | **YES** |
+| HelloRequest handoff | `:337`–`:349`, `:792`, `:1200`, `:1876` | present, 25 bytes | present, 25 bytes | **BYTE-IDENTICAL** |
+
+**Fields the source never touches**, confirmed by targeted grep: `set1_groups`,
+`set1_curves`, sigalgs, SNI, ALPN, any `SSL_CTX_set1_*`. `SSL_CTX_set_ecdh_auto`
+at `:1500` is a no-op macro on OpenSSL 1.1.0+ (§7) and sets nothing. Therefore
+`supported_groups`, `signature_algorithms`, `ec_point_formats`, session ticket,
+EMS and extension ordering are **all** library defaults.
+
+### P1 — CONFIRMED
+
+Every GridMate-controlled field matches. Extension **type list is
+character-identical** on both sides: `11,10,35,22,23,13`.
+
+### P2 — CONFIRMED. Four divergences, all library noise, none in a field the source sets
+
+| # | Difference | Retail (1.1.1k) | Reference (3.6.4) | Bucket |
+| - | ---------- | --------------- | ----------------- | ------ |
+| 1 | RFC 5746 renegotiation signalling | `0x00FF` SCSV in cipher list; **no** ext 65281 | ext 65281 `ff 01 00 01 00`; **no** SCSV | Noise. RFC 5746 §3.4 permits either encoding and forbids both. Perfectly anticorrelated across the two captures. `SSL_CTX_set_cipher_list` cannot add `0x00FF` — OpenSSL appends it. Confirmed at byte level: `00 04 c0 30 00 ff` vs `00 02 c0 30`. |
+| 2 | `signature_algorithms` | 23 entries, incl. SHA-1 (`0x0201`, `0x0202`, `0x0203`) | 20 entries, SHA-1 absent | Noise. 3.x dropped SHA-1 sigalgs from defaults. Same order otherwise. |
+| 3 | `supported_groups` | `…,0x0019,0x0018` | `…,0x0018,0x0019` | Noise. Same five curves, last two transposed (secp521r1/secp384r1). |
+| 4 | `ec_point_formats` | `03 00 01 02` — three formats | `01 00` — uncompressed only | Noise. Known 1.1.1k-vs-3.x default change. |
+
+These four fully account for the ClientHello length difference (retail 146,
+reference 141). No residual.
+
+### P3 — CONFIRMED. Mutual auth is stock GridMate — and rests on a bug in Amazon's source
+
+**This was the load-bearing question T3 could not answer, and the reason the
+reference build exists (CHARTER §2).**
+
+Source, `:1522`–`:1525`:
+
+```cpp
+int verificationMode = SSL_VERIFY_PEER;                    // 0x01
+if (m_desc.m_authenticateClient)
+{
+    verificationMode = SSL_VERIFY_FAIL_IF_NO_PEER_CERT;    // 0x02 — assignment, not |=
+}
+```
+
+OpenSSL gates CertificateRequest on `verify_mode & SSL_VERIFY_PEER`.
+`SSL_VERIFY_FAIL_IF_NO_PEER_CERT` (`0x02`) is documented as meaningful only in
+combination with `SSL_VERIFY_PEER` (`0x01`); alone, `0x02 & 0x01 == 0`, so it
+behaves as `SSL_VERIFY_NONE`. **The branch is inverted against its own stated
+intent** — the comment above it says the default authenticates only the server:
+
+| `m_desc.m_authenticateClient` | mode | Server behaviour |
+| --- | --- | --- |
+| false (default) | `0x01` | **Sends CertificateRequest**, does not require a cert back |
+| true | `0x02` | Sends nothing — verification off |
+
+There is **one shared `SSL_CTX`** built for both roles; role separation is in the
+HSM, not the context.
+
+Confirmed on the wire, both sides:
+
+| | Reference (`carrier_dtls.pcap`) | Retail (`t3_handshake_epoch0.pcap`) |
+| --- | --- | --- |
+| CertificateRequest (13) | frame 12, from **4428** (server) | frame 10, from **52.223.16.88** (server) |
+| Server Certificate (11) | frames 9–10, **1380** bytes | frame 7, **958** bytes |
+| Client Certificate (11) | frame 14, from 4427, **length 0** | frame 12, from 192.168.1.33, **length 0** |
+
+**Retail's type 13 needs no Amazon modification to explain it.** Server asks,
+client answers with an empty certificate list, handshake continues — exactly
+`SSL_VERIFY_PEER` without `FAIL_IF_NO_PEER_CERT`.
+
+**S-track consequence — a requirement removed, not added.** The client presents
+**no** certificate. There is no embedded client cert in `NewWorld.exe`, so "where
+does the client get its cert" is not an open question, and there is no
+`Certificates.cpp`-equivalent to locate. A private server sends a
+CertificateRequest and **accepts an empty response**. No client PKI, no client-cert
+validation. T5_PROMPT Step 5 held this open as an H/S-track lead; it is closed.
+
+### P4 — CONFIRMED
+
+`decode_carrier.py` parsed both epoch-0 flights through the same code path, no
+per-capture special-casing:
+
+| | Retail | Reference |
+| --- | --- | --- |
+| datagrams with payload | 16 | 64 |
+| DTLS | 16 | 57 |
+| Carrier | 0 | 0 |
+| `'G'` wakeup | 0 | 7 |
+| **undecodable** | **0** | **0** |
+
+Same 13-byte `RecordHeader`, same 12-byte `HandshakeHeader`, same handshake-type
+sequence. The §12A type-20 (ChangeCipherSpec) decoder gap did not arise here — the
+extracted epoch-0 file stops before CCS — and **remains open**.
+
+### The handshake flights are identical, including `message_seq`
+
+```
+CH(seq0, no cookie) → HVR(seq0) → CH(seq1, cookie=20)
+  → HelloRequest(seq0) → CH(seq0, no cookie)
+  → SH(0) Cert(1) SKE(2) CertReq(3) SHD(4)
+  → Cert(1, empty) CKE(2) → [CCS] → NewSessionTicket(5)
+```
+
+Same types, same order, same `message_seq` on both sides. The **only** structural
+difference is which oversized message got DTLS-fragmented: retail splits
+ServerKeyExchange (frames 8–9), the reference splits Certificate (frames 9–10).
+That follows from the measured cert sizes (958 vs 1380) hitting the PMTU at
+different points. Content difference, not protocol difference — **do not read the
+frame-count asymmetry as a divergence.**
+
+### The strongest single piece of evidence: a byte-identical HelloRequest
+
+Retail datagram #3 and reference datagram #5 are identical across all 25 bytes:
+
+```
+16 fe ff 00 00 00 00 00 00 00 00 00 0c 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+This message is **hand-built by GridMate**, not emitted by OpenSSL —
+`ConnectionSecurity::HelloRequest` is a headers-only struct (`:337`–`:349`) packed
+by `OnStateSendHelloRequest` (`:792`). The `fe ff` is GridMate's hardcoded
+`DTLS1_VERSION` (`:308`, `:312`, `:343`), **not** DTLS 1.2. An identical hand-built
+message on both sides cannot be produced by an OpenSSL version difference.
+
+**Corollary:** every `fe ff` record in either capture is a GridMate hand-pack. Both
+captures contain exactly two — HelloVerifyRequest and HelloRequest.
+
+### The HelloRequest handoff — mechanism, and a hard S-track requirement
+
+**This corrects §12A's "early renegotiation" reading — see §13.** The third
+ClientHello is **not** renegotiation. It is stock GridMate's cookie handoff, and
+the reference performs it identically without Amazon touching anything.
+
+`message_seq` is what proves it: the cookie-echo ClientHello is **seq 1**, then
+HelloRequest arrives, then the next ClientHello **resets to seq 0** carrying **no
+cookie**. A renegotiation restarts the flight *after* a completed handshake; this
+restarts it *before* one ever began.
+
+Mechanism, from source:
+
+- GridMate runs the cookie exchange **in its own raw-recv state machine** (`:1838`
+  generate, `:1869` verify) with a hand-built HelloVerifyRequest. **OpenSSL never
+  sees those datagrams.**
+- Once the cookie verifies, the server creates a Connection initialized directly
+  into `CS_SEND_HELLO_REQUEST` (`:1876`).
+- That state packs and sends the HelloRequest (`:792`), resending on exponential
+  backoff capped at 1000 ms (`:821`–`:837`).
+- The HelloRequest makes the client's OpenSSL start a **fresh** handshake at
+  `message_seq 0`, which the server's `SSL*` then consumes.
+- GridMate also **detects** HelloRequest on the wire itself
+  (`IsHelloRequestHandshake`, `:396`–`:401`; used at `:1218`, `:1230`) rather than
+  passing it through.
+- Line `:494` states the intent in a comment: send back HelloRequest to restart the
+  hello sequence.
+
+So the hello that satisfies GridMate's cookie check and the hello OpenSSL actually
+handshakes on are **two different messages**, and the real handshake carries **no
+cookie at all**.
+
+**Hard S-track requirement.** A private server must:
+
+1. Run the cookie exchange **itself, at the datagram layer** — GridMate's own
+   `GenerateCookie`/`VerifyCookie`, 20-byte output (HMAC-SHA1; this is why
+   `<openssl/hmac.h>` is included in a file with otherwise no use for it).
+   Enabling OpenSSL's cookie callbacks is **not** equivalent and will not
+   interoperate.
+2. Send a **HelloRequest** once the cookie verifies, with resend/backoff.
+
+Skip step 2 and the client sits at `message_seq 1` waiting for a ServerHello that
+never arrives. **Neither behaviour is derivable from RFC 6347** — this is
+GridMate's own sequencing, now confirmed identical in retail.
+
+### Caveats on "the reference is a valid instrument"
+
+- **Epoch 0 only.** The match is proven for the cleartext handshake. Epoch ≥ 1
+  Carrier framing inside DTLS remains proven on the reference and **inferred** for
+  retail. H3 plaintext is what promotes it.
+- **Content differs, structure does not.** Certificates (958 vs 1380 bytes), cookie
+  values and randoms are per-deployment and per-connection. No observed cookie or
+  cert is a constant.
+- **Fragmentation is PMTU-dependent**, not protocol-dependent.
+- **One shared `SSL_CTX`.** Client/server differences come from the HSM, not from
+  separate context setup — relevant when modelling the server side against the
+  reference.
+- **`m_authenticateClient` is untested in both directions.** Both captures exercise
+  the `false` path. If future work needs the `true` path, note it hits the inverted
+  branch above and will *disable* verification.
+
+### Noticed, out of scope — H-track recon (recorded, NOT built on — CHARTER §3)
+
+- **`SSL_CTX_set_ex_data(m_sslContext, kSSLContextDriverPtrArg, this)`**, set
+  immediately after the verify setup, stashes the driver pointer on the context —
+  an `SSL*` → driver back-reference. Potentially useful for recovering driver state
+  from a hooked `SSL_read`/`SSL_write` frame. Recorded only.
+- **No `SSL_CTX_set_keylog_callback` anywhere in `SecureSocketDriver.cpp`.** This
+  **upgrades** §12A's interpretation: it is not that Amazon removed or failed to
+  wire the callback into the DTLS context — **stock GridMate never had it.**
+  Nothing was stripped. §12A's conclusion is unchanged (H3's signature-scan hook is
+  still required for the world stream); only the explanation improves.
+
+### What this unblocks
+
+- **H-track opens.** The reference is a validated model for retail's transport, so
+  H1/H2 tooling developed against it can be trusted to transfer. Unchanged from
+  §12A: retail OpenSSL is static, so H3 reaches `SSL_read`/`SSL_write` by
+  **signature scan**, against a **Proton/Wine** process (GE-Proton, §5).
+- **P-track's shape is fixed.** Retail's epoch-≥1 plaintext is expected to be §8
+  Carrier framing, on the strength of a validated reference. Confirming it is H3's
+  output, not an assumption to build on beforehand.
+- **S-track gains two requirements and loses one.** Gained: GridMate's own 20-byte
+  cookie exchange plus the HelloRequest handoff; and send CertificateRequest,
+  accept an empty client Certificate. Lost: no client-certificate PKI, nothing to
+  locate inside `NewWorld.exe`.
+
+---
+
 ## 13. Corrections — beliefs that turned out wrong
 
 Acting on any of these wastes real time. Every session that overturns a prior
@@ -1068,6 +1367,10 @@ claim adds a row here rather than deleting the claim.
 | "645 datasheets extracted in 173ms is suspiciously fast — likely a silent failure." — raised in session. | **WRONG.** Output verified column-by-column: `MasterItemDefinitions_Faction`, 127 columns × 4121 rows, legible headers. Oodle is simply that fast. Worth the check regardless — it is the D2 prompt's named failure mode — but speed alone was not evidence of anything. |
 | "EAC ships as `EOSSDK-Win64/Win32-Shipping.dll`" — §10, written in a way that reads as implying `Bin64/`. | **IMPRECISE, and misleading in one specific way.** The EAC files live in `<install>/EasyAntiCheat/`, a **sibling** of `Bin64/`. A session scanning `Bin64/` alone would wrongly conclude EAC is absent. Corrected location is in §5. Charter §3 unchanged — location only. |
 | "`SSLKEYLOGFILE` is honoured, so the client's decrypted stream is readable from a file with no hook — H1/H3 may be unnecessary." — raised in session (T3, 2026-08-29) on finding the keylog file populated (178 lines) and an incrementing byte pattern in the payload. | **WRONG for the world stream; true only for auth.** The keylog decrypts the TLS 1.2 HTTPS auth phase but **not** the DTLS world stream: the world ClientHello's client random (`0674c28f…5aa976`) is absent from the file and Wireshark reports `no decoder available` for every UDP/27001 record, while the TCP/443 flows show `dissect_ssl_payload decrypted`. The callback is wired into the general TLS `SSL_CTX`, not the GridMate `SecureSocketDriver` DTLS context. **H3's signature-scan hook on `SSL_read`/`SSL_write` is still required.** Cause of the error: a populated keylog file plus an incrementing payload run (actually the AES-GCM explicit-nonce counter, visible by design in ciphertext) were read as success *before* running the falsifiable check — the `tls.debug` decrypt log, which returned zero decrypts for the world flow. §12A. |
+| "`SSL_CTX_set_cookie_generate_cb` not disabled." — §12A, P3 row (T3, 2026-08-29). Assumes OpenSSL owns the DTLS cookie exchange. | **WRONG — GridMate never used OpenSSL's cookie callbacks at all.** `rg 'set_cookie_generate_cb\|set_cookie_verify_cb'` over the whole of `dev/Code/Framework/GridMate/` returns **0** hits. The cookie is generated and verified by GridMate's own `SecureSocketDriver::GenerateCookie` (`:1699`) / `VerifyCookie` (`:1737`), driven from its raw-recv state machine (`:1838`, `:1869`) with a hand-built HelloVerifyRequest, **before OpenSSL sees the datagram**. Cause of the error: saw a wire behaviour that looked like OpenSSL's stateless-cookie feature and attributed it to the library without checking the source. **Consequence:** cookie length and mechanics move into the GridMate-**controlled** bucket (where they match retail exactly, 20 bytes both sides), and a private server must reimplement the derivation rather than enable a library callback. §12B, test #44. |
+| "**Early renegotiation.** The server sends a HelloRequest, which triggers a *fourth* handshake message — a third ClientHello at frame 245. So the extra ClientHello is renegotiation, not a retransmit." — §12A, additional handshake observations (T3). | **WRONG about the mechanism; the observation itself was correct.** It is not renegotiation — it is stock GridMate's **cookie handoff**, and the reference build (`7d4f1ee6`) does exactly the same thing with no Amazon involvement. Proof: `message_seq` **resets to 0** on the third ClientHello (after the cookie-echo hello at seq 1), and that hello carries **no cookie**; a renegotiation would follow a completed handshake, not precede one. Mechanism is `CS_SEND_HELLO_REQUEST` (`:681`, `:792`, `:1200`, `:1876`), a dedicated server state entered after cookie verification, with exponential-backoff resend (`:821`–`:837`). Cause of the error: a server-initiated HelloRequest *is* renegotiation in ordinary TLS, so the standard reading was applied to a transport that uses the message for something else. **Consequence: a hard S-track requirement** — the server must send a HelloRequest after verifying the cookie or the client stalls at `message_seq 1`. §12B, test #47. |
+| "Retail will show three cleartext ClientHellos and the reference two, the third being the HelloRequest-triggered renegotiation; do not mix it into the diff." — raised in session (T5, 2026-08-29) as a caution when building the Step 3 filter. | **WRONG — the reference shows three as well, and emits its own HelloRequest.** Both captures show the identical `0, 20, 0` cookie-length pattern across three ClientHellos plus a type-0 HelloRequest at the same position. The caution was harmless (pinning `frame.number` was still right) but its reasoning was the §12A renegotiation error inherited uncritically. Cause of the error: predicted a retail-only behaviour from a retail-only observation without asking whether the reference did it too — which is the exact question the reference build exists to answer (CHARTER §2). Test #47. |
+| "The HelloVerifyRequest is DTLS 1.0 (`fe ff`) … RFC 6347 §4.2.1: the server is stateless at that point and has not negotiated a version." — §9. | **NOT WRONG, BUT INCOMPLETE — and the real mechanism is more useful.** The RFC permits it, but the actual cause is that GridMate **hardcodes** `RecordHeader::m_version = DTLS1_VERSION` (`0xFEFF`) in its hand-packed records (`:308`, `:312`, `:343`). This moves the `fe ff` version from "OpenSSL/RFC default" into the **GridMate-controlled** bucket, where it matches retail exactly. **Diagnostic value:** every `fe ff` record in a capture is a GridMate hand-pack — exactly two per handshake (HelloVerifyRequest, HelloRequest). §9's advice not to chase it stands. §12B. |
 
 ---
 
@@ -1119,3 +1422,11 @@ result — so no test is silently retried and no result is remembered wrong.
 | 39 | **T3 · P3** is the DTLS cookie echoed verbatim? | ClientHello → HVR(`0xfeff`) → ClientHello with the same cookie. | **Confirmed.** Cookie `eb14bc1b7aaadacffb30cd3334bc814690591056` on the HelloVerifyRequest (frame 242, `0xfeff`) and echoed on the retry ClientHello (frame 243, `0xfefd`); first ClientHello (241) carries none. |
 | 40 | **T3 · P2** run `decode_carrier.py` against the retail capture; predict a loopback/offset break. | Ethernet-vs-loopback offset or a `127.0.0.1` filter breaks it. | **Falsified (no break).** Decoder ran unmodified: 8618/8637 datagrams as DTLS 1.2, 0 Carrier. Both loopback and `enp2s0` are `DLT_EN10MB`, so no offset issue. 19 undecodable = ChangeCipherSpec (content type 20, no decoder branch) + Brave/QUIC strays on `:50229`. Also surfaced: server HelloRequest (early renegotiation) and CertificateRequest (type 13, mutual auth). §12A. |
 | 41 | **T3 · H-track** launch once with `SSLKEYLOGFILE` set; does the client honour it? | Negative — the keylog callback is usually stripped from a shipped OpenSSL. | **Split result.** File **written**, 178 lines. **Auth/HTTPS DECRYPTS** (TCP/443; `tls.debug` `dissect_ssl_payload decrypted`). **World DTLS does NOT**: world ClientHello random `0674c28f…5aa976` absent from keylog; `tls.debug` `no decoder available` for every UDP/27001 record. Callback wired into the general TLS context, not the GridMate DTLS `SSL_CTX`. **H3 signature-scan hook still required** for the world stream; keylog gets the auth phase free. §12A, §13. |
+| 42 | **T5 · Step 0** verify `build/carrier_dtls.pcap` contains epoch 0, not merely that the file exists (`conv,udp` + count `dtls.record.content_type==22`). | Handshake present, or regenerate. Test #18's `--secure` capture was 30/30 epoch-1 with no handshake, so existence alone proves nothing. | **Confirmed, no regeneration needed.** 16 type-22 records. Flow `127.0.0.1:4427 ↔ 4428`; the two self-addressed rows are `'G'` wakeups (215 bytes / 5 frames = 43 = 14+20+8+1, confirming §8). Server is **4428** — the heavier direction (4,840 B), which sends the cert flight. |
+| 43 | **T5 · Step 2** read `SecureSocketDriver.cpp` for every explicitly-set `SSL_CTX` field, to fix the GridMate-controlled list **before** diffing bytes (CHARTER §4). | A short list: cipher, version, maybe verify. Everything else library default. | **Confirmed, and richer than predicted.** Only `SSL_OP_NO_QUERY_MTU` is set via `set_options`; **no** `set1_groups`/`set1_curves`/sigalgs/SNI/ALPN anywhere; `SSL_CTX_set_ecdh_auto` is a 3.x no-op. Unanticipated: the cookie is GridMate's own (see #44) and `RecordHeader::m_version` is hardcoded `DTLS1_VERSION`. Also surfaced `SSL_CTX_set_ex_data` driver back-reference (H-track, recorded only). |
+| 44 | **T5 · Step 2** `rg 'set_cookie_generate_cb\|set_cookie_verify_cb'` across all of `dev/Code/Framework/GridMate/`. | Present — §12A assumed OpenSSL owned the cookie exchange. | **Falsified — 0 hits tree-wide.** The cookie is GridMate's own `GenerateCookie`/`VerifyCookie`, hand-built HVR, before OpenSSL sees the datagram. Moves cookie mechanics into the GridMate-controlled bucket. §12B, §13. |
+| 45 | **T5 · P3** cross the `:1522`–`:1553` verify-mode source read against CertificateRequest (13) and client Certificate (11) on both wires. | Uncertain going in — `SSL_VERIFY_PEER` appears in the file, but the `:1525` branch **assigns** `SSL_VERIFY_FAIL_IF_NO_PEER_CERT` rather than OR-ing it, which alone is `SSL_VERIFY_NONE`. Predicted type 13 on both sides if the default (`false`) path is taken. | **Confirmed, prediction held.** CertReq from the server on both (ref frame 12 / port 4428; retail frame 10 / 52.223.16.88). **Client Certificate present but length 0 on both** (ref frame 14; retail frame 12 from 192.168.1.33). Mutual auth is stock; the client presents nothing. **S-track requirement removed:** no client PKI, no embedded cert to find in `NewWorld.exe`. |
+| 46 | **T5 · P1/P2** field-by-field ClientHello diff, frames pinned, first hello each side. | GridMate-controlled fields identical; extension block differs on 1.1.1k-vs-3.x defaults. | **Confirmed, both halves.** Version `0xfefd` and one real suite `0xC030` identical; extension **type list character-identical** (`11,10,35,22,23,13`). Four noise divergences, all in unset fields: RFC 5746 SCSV-vs-ext-65281 (perfectly anticorrelated; byte level `00 04 c0 30 00 ff` vs `00 02 c0 30` + `ff 01 00 01 00`), sigalgs 23-vs-20 (SHA-1 dropped in 3.x), `supported_groups` last-two transposed, `ec_point_formats` `03 00 01 02` vs `01 00`. Fully accounts for the 146-vs-141 length difference. |
+| 47 | **T5** dump the full ordered handshake sequence with `message_seq`, both sides, to classify the third ClientHello. | Retail three hellos and a HelloRequest; reference two and none — i.e. §12A's renegotiation is retail-specific. | **Falsified — both sides identical: three hellos and a HelloRequest each.** Same types, same order, same `message_seq`. The third hello **resets to seq 0 with no cookie**, so it is the GridMate cookie handoff, not renegotiation. §12A corrected (§13). The HelloRequest is **byte-identical across retail and reference**, all 25 bytes — a GridMate hand-pack, and the single strongest structural-identity result in T5. Only structural difference: which oversized message fragments (retail SKE frames 8–9, ref Certificate frames 9–10), from the 958-vs-1380 cert sizes hitting PMTU. |
+| 48 | **T5 · P4** run `decode_carrier.py` over both epoch-0 flights. | Both parse through the same code path, no special-casing. | **Confirmed.** Retail 16/16 DTLS, 0 Carrier, **0 undecodable**. Reference 57 DTLS + 7 wakeup, 0 Carrier, **0 undecodable**. Same 13-byte `RecordHeader` / 12-byte `HandshakeHeader`, same type sequence. The §12A type-20 CCS gap did not arise (the extracted file stops before CCS) and **remains open**. |
+| 49 | **T5** `openssl s_client -dtls1_2 -connect 127.0.0.1:1` to confirm local 3.6.4 emits ext 65281 rather than SCSV. | Local hello shows 65281 and no SCSV, pinning the RFC 5746 difference on the library. | **Inconclusive, and unnecessary.** Port 1 refused (`write:errno=111`) before any ClientHello was emitted; nothing to inspect. Not retried: the reference capture **is** the 3.6.4 datapoint, and test #43 established GridMate never sets that field, so the bucket holds by construction. Recorded so it is not re-attempted. |
