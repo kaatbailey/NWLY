@@ -31,6 +31,22 @@ the ready-to-paste prompt for each chunk.
 > STATE §15. **No chunk was marked complete and no finding was altered — this is a
 > sequencing change.**
 >
+> **Third amendment, same day — P0 run, verdict PARTIAL; the game's retirement date
+> becomes a routing constraint.** P0 ticked `[x]` with a pointer to STATE §16 and a
+> DONE banner on `P0_PROMPT.md`; **`P0_PROMPT.md` added to the standalone-prompt
+> list**, where it should have been when the chunk was created. Two chunks created
+> from P0's remainder: **P0b** (re-capture to decrypt the queue response — OPEN-1)
+> and **P0c** (decode `Characters[].PublishedData` — FIND-3). **S0 moved to `[!]`
+> blocked**, because its one hard input is the thing P0 could not read. Order section
+> amended. Three claims inside `P0_PROMPT.md` struck as falsified, including two the
+> prompt inherited from STATE §12A.
+>
+> **And the constraint that now sits above all of it: Amazon retires the servers
+> 31 January 2027** (STATE §16.0, read from the client's own news payload). Every
+> capture-dependent chunk has a deadline; every file-dependent chunk does not. The
+> order below is amended accordingly. **No chunk was un-ticked and no finding
+> altered.**
+>
 > **No prose was deleted.** The only text overwritten in place is the six index-table
 > status rows and the T3 prompt's `← NEXT` header — which is precisely what "tick the
 > row, add a DONE banner" means, and none of it carried a finding. Everything else
@@ -67,7 +83,10 @@ must survive; the prompt is disposable. If a future session only reads one
 document, it should be the charter.
 
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
-its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`).
+its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`,
+**`P0_PROMPT.md`** — added 2026-08-30; it was missing from this list while P0 ran,
+which is the same "a prompt that exists only on one machine cannot be handed to
+anything" failure CHARTER §6.7 names).
 Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
 not the summary.
@@ -127,7 +146,9 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                     | Depends on | Deliverable                                     |
 | ----- | ----------------------------------------- | ---------- | ----------------------------------------------- |
-| `[ ]` | **P0** Auth-phase decode (TCP/443)        | —          | **NEW 2026-08-30, unblocked, no EAC contact.** The keylog already decrypts this flow (§12A, test #41) and nobody has read it. Login → server list → session token → **the world-address handoff**, which S0 depends on |
+| `[x]` | **P0** Auth-phase decode (TCP/443)        | —          | **DONE 2026-08-30. VERDICT: PARTIAL.** Auth sequence documented end to end; **selection call identified** — `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni`; world list read and proven **GUID-only, no address field**. **The world address was NOT read:** the response carrying it does not decrypt (`Cannot find master secret`) → **OPEN-1**. STATE §16. Prompt: `P0_PROMPT.md` |
+| `[ ]` | **P0b** Decrypt the queue response       | P0         | **NEW 2026-08-30. The one thing standing between here and S0.** Re-capture forcing a **full** TLS handshake on the queue connection so the keylog records its key. Hypothesis: the callback fires on full handshakes only, so resumed sessions go unlogged (**DEF-2**). ~15 minutes, retryable — **but only until 31 Jan 2027.** STATE §16.7, test #54 |
+| `[ ]` | **P0c** Decode `PublishedData`           | P0         | **NEW 2026-08-30. Cheap, and it is server→client state.** Base64 + zlib (`eNr…`) blobs in `Characters[]` of the `getlogininfo` response — a response we can **already read**, no keys and no new capture needed. FIND-3, STATE §16.3 |
 | `[ ]` | **P1** Handshake sequence                 | ~~T5~~ **T5 done**, ~~H3~~ **S1a or H3** | The connect exchange, byte-documented. **Scope narrowed — the epoch-0 DTLS half is already byte-documented in STATE §12B; what remains is the GridMate `Carrier` handshake inside epoch ≥ 1.** Reachable from S1a's plaintext for the client→server half without H3 |
 | `[ ]` | **P2** Message-type census                | ~~H3~~ **H2, or S1a, or FIND-2** | The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3 |
 | `[ ]` | **P3** Position/movement message          | ~~H3~~ **S1a or H3**, P2 | The controlled-walk experiment, decoded. Outbound position messages arrive as plaintext at an S1a server; H3 only adds the inbound half |
@@ -138,7 +159,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                       | Depends on | Deliverable                          |
 | ----- | ------------------------------------------- | ---------- | ------------------------------------ |
-| `[ ]` | **S0** Redirection feasibility              | P0         | **NEW 2026-08-30, no EAC contact.** Can the client be pointed at a world server we run? Hosts/DNS on our own machine. Cheap, and everything below rests on it |
+| `[!]` | **S0** Redirection feasibility              | ~~P0~~ **P0b** | **BLOCKED 2026-08-30 on OPEN-1**, and the dependency has moved from P0 to **P0b**. P0 established *where* the handoff is but not *what it says*. Two findings already reshape this chunk: **(a) a hosts/DNS redirect will not work** — no DNS query resolves the world host in five captures, so there is no name to catch; **(b) the interception point is the queue response**, which means a **TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net`** (that host *is* DNS-resolvable), with Wine-prefix certificate trust as the obstacle to scope. Requirements derived in STATE §16.6 |
 | `[ ]` | **S1a** DTLS server (epoch 0)               | T5         | **NEW 2026-08-30, unblocked, no EAC contact.** Fully specified by §12B. **The inversion: when the client handshakes with us we hold the session keys, so its messages arrive as plaintext on our socket** — this replaces H3 for the client→server half |
 | `[!]` | **S1b** Carrier handshake (epoch ≥ 1)       | S1a, P1    | The GridMate `DefaultHandshake` / connection request-ack inside the encrypted channel |
 | `[!]` | **S2** Stand a character in the world       | S1b, P4    | A character loads and renders         |
@@ -220,25 +241,36 @@ attempted **once**; EAC preventing the hook is a **terminal result**, and any st
 aimed at surviving detection is circumvention, off-charter under §3, and does not
 get pursued or recorded.
 
-**The order, none of items 1–7 contacting a running retail client:**
+> **DEADLINE, added 2026-08-30 (STATE §16.0).** Amazon retires the servers **31 Jan
+> 2027**. This splits the order by input type: **capture-dependent chunks perish on
+> that date** (P0b, and any future live-traffic observation); **file-dependent chunks
+> do not** (H2, P2/FIND-2, S1a against the reference, H1, H4). When in doubt about
+> what to run next, run the perishable thing.
 
-1. **H2** — static Ghidra. Scope it **ambitiously**: with H3 off the critical path
-   this is a primary source of protocol structure, not just a hook-targeting step.
-2. **P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. Possibly schemas
-   for free, from the binary, with no capture at all.
-3. **P0** — auth-phase decode. Already decrypts; never read. Yields the
-   world-address handoff.
-4. **S0** — redirection feasibility. Cheap, and S1a rests on it.
-5. **S1a** — the DTLS server. **The inversion:** the client handshakes with us, we
-   hold the keys, its messages arrive as plaintext on our socket.
-6. **H1** — reference-build hook and signature scan. Our binary, and the last free
-   oracle for the scan.
-7. **H4** — reflection-reader decision gate. Static, independent, a "no" is as
-   useful as a "yes".
-8. **H3** — last resort only.
+**The order, none of items 1–8 contacting a running retail client. Amended
+2026-08-30 after P0:**
 
-**Start with H2 or P0.** H2 needs nothing and no client. P0 needs only the keylog
-capture you already have. Neither depends on the other.
+1. ~~**P0** — auth-phase decode.~~ **DONE (PARTIAL), STATE §16.** Left a single
+   blocker on the critical path: **OPEN-1**, the undecrypted queue response.
+2. **P0b** — decrypt the queue response. **PERISHABLE and critical-path: this is what
+   S0 waits on.** ~15 minutes. Do it before the deadline and before anything that
+   doesn't perish. STATE §16.7.
+3. **H2** — static Ghidra. Scope it **ambitiously**: a primary source of protocol
+   structure, not just a hook-targeting step. File-based, no deadline.
+4. **P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. File-based.
+5. **P0c** — decode `PublishedData` (FIND-3). Cheap, no capture, server→client state.
+6. **S0** — redirection feasibility. **Unblocks once P0b lands.** STATE §16.6 already
+   derived its requirements: proxy the queue endpoint, not a DNS name.
+7. **S1a** — the DTLS server. **The inversion:** the client handshakes with us, we
+   hold the keys, its messages arrive as plaintext on our socket. Reference-testable
+   now, no deadline.
+8. **H1** — reference-build hook and signature scan. **H4** — reflection-reader
+   decision gate. Both static, independent, no deadline.
+9. **H3** — last resort only.
+
+**Start with P0b.** It is short, it is on the critical path, and it is the one
+remaining chunk whose input disappears on a fixed date. Everything else here still
+works in February 2027; P0b does not.
 
 **What this order does not yield** is the server→client direction in captured form.
 Items 1–7 give the client's outbound messages plus whatever comes out of the binary;

@@ -1,5 +1,27 @@
 # P0 — Auth-phase decode (TCP/443)
 
+> # ✅ DONE — 2026-08-30. VERDICT: PARTIAL.
+> **Findings folded into `STATE.md` §16.** Read that, not this.
+>
+> **What was achieved:** the auth sequence documented end to end (§16.2); the
+> **selection call identified** — `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni`
+> (§16.4), with an unplanned two-variant differential from a refused US West selection;
+> the world list read and shown to be **GUID-only with no address field** (§16.3);
+> predictions 1–4 resolved (§16.5); S0's requirements derived (§16.6).
+>
+> **What was not:** **the world address was never read.** The response that must carry
+> it — frame 2648, 68 frames before the world DTLS ClientHello — **does not decrypt**
+> (`Cannot find master secret`; the keylog is missing that session's key). Recorded as
+> **OPEN-1**, owned by a follow-on chunk **P0b**.
+>
+> **Also produced:** three §13 correction rows (two against §12A, one against this
+> prompt), test rows #50–#54, **DEF-2**, **OPEN-1**, **OPEN-2**, **FIND-3**, and
+> **§16.0 — the game is being retired 31 Jan 2027**, which puts a hard deadline on all
+> capture-dependent work.
+>
+> Struck-through text below is what this prompt got wrong. Struck, never deleted
+> (CHARTER §5).
+
 **Read `CHARTER.md` and `STATE.md` first. This file is the chunk; those two are the
 context. Do not act on a summary of either.**
 
@@ -110,14 +132,24 @@ not need to.
 
 ## Scope
 
-Work only the TCP/443 flows to AWS: `44.220.67.249`, `13.217.79.62`,
-`18.238.35.71` (§12A). **Cloudflare 443 — `104.18.124.108`, `162.159.*` — is CDN/API
-and not the game backend**; exclude it or you will spend the chunk reading asset
-delivery.
+~~Work only the TCP/443 flows to AWS: `44.220.67.249`, `13.217.79.62`,
+`18.238.35.71` (§12A).~~ **WRONG — all three, and §12A is corrected in §13.** By SNI:
+`44.220.67.249` is **kinesis telemetry**, `18.238.35.71` is **CloudFront CDN**, and
+`13.217.79.62` is absent from the T3 capture entirely (the `13.217.79.*` range is
+**`sts.us-east-1`**). **The real auth host set is §16.2** — `tokenservice`,
+`prod.identity-service`, `sts.us-east-1`, `entitlementservice`, and above all
+`d2oeuvxi3kfsrw.cloudfront.net`, which serves both `getlogininfo` and the queue POST.
 
-Expect **TLS 1.2, cipher `0xC02F`** on these flows (§12A). Application data is
-probably HTTP/2 and probably compressed; tell tshark so, rather than concluding the
-bodies are binary.
+**Cloudflare 443 — `104.18.124.108`, `162.159.*` — is CDN/API and not the game
+backend**; exclude it. Confirmed, and `162.159.135.234` specifically was Discord.
+
+Expect **TLS 1.2, cipher `0xC02F`** on these flows (§12A) — confirmed.
+~~Application data is probably HTTP/2 and probably compressed; tell tshark so, rather
+than concluding the bodies are binary.~~ **WRONG, and this advice actively caused
+harm.** It is **HTTP/1.1** throughout (`aws-sdk-cpp/1.7.193`). The `http2.*` filters
+built on this returned empty against 148 successful decrypts, which read as "no
+traffic." **The correct rule is §16.8: on any empty tshark result, read
+`tls.debug_file` before believing it.**
 
 Suggested starting point — adapt rather than copy blindly:
 

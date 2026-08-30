@@ -5,10 +5,10 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-30** |
-| Written against commit | use command then paste at end, git rev-parse --short HEAD`|  3a964cd |
-| Section count (every `## ` header, this one included) | **18** |
-| Highest test number (§14) | **49** |
-| Correction row count (§13) | **19** |
+| Written against commit | **`<FILL: git rev-parse --short HEAD`>** |
+| Section count (every `## ` header, this one included) | **19** |
+| Highest test number (§14) | **54** |
+| Correction row count (§13) | **22** |
 | Chunks complete | T1, T2, T3, T4, T5, D2 |
 | Open gates | **0** — GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
 
@@ -17,10 +17,10 @@ read on, not to propose anything:
 
 ```fish
 cd ~/Documents/NWLY; and git pull
-grep -c '^## ' STATE.md                                                    # expect 18
-awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 49
+grep -c '^## ' STATE.md                                                    # expect 19
+awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 54
 awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
-  | grep -vc '^| Old claim\|^| ---'                                        # expect 19
+  | grep -vc '^| Old claim\|^| ---'                                        # expect 22
 git log -1 --format='%h %ad %s' origin/Master
 ```
 
@@ -145,7 +145,17 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
 
 ## 2. Where things stand
 
-**As of 2026-08-29.**
+**As of 2026-08-30.**
+
+> **THE GAME IS BEING RETIRED — this is a project deadline, added 2026-08-30 (§16.0).**
+> Amazon's own sunset notice, served to the client and read in the P0 captures:
+> **servers go offline 31 January 2027**; the title was delisted 15 January 2026. The
+> development team is gone. **Everything capture-dependent (P0, S0, any observation of
+> live retail traffic) stops being possible on that date; everything file-dependent
+> (H2, FIND-2, D2, the reference build) is unaffected.** Captures are a perishable
+> input — take more than seem necessary and keep them. This *raises* the priority of
+> the S-track: after the retirement date, a working private server is the only way the
+> client runs at all.
 
 **Complete:**
 
@@ -1499,6 +1509,9 @@ claim adds a row here rather than deleting the claim.
 | "**Early renegotiation.** The server sends a HelloRequest, which triggers a *fourth* handshake message — a third ClientHello at frame 245. So the extra ClientHello is renegotiation, not a retransmit." — §12A, additional handshake observations (T3). | **WRONG about the mechanism; the observation itself was correct.** It is not renegotiation — it is stock GridMate's **cookie handoff**, and the reference build (`7d4f1ee6`) does exactly the same thing with no Amazon involvement. Proof: `message_seq` **resets to 0** on the third ClientHello (after the cookie-echo hello at seq 1), and that hello carries **no cookie**; a renegotiation would follow a completed handshake, not precede one. Mechanism is `CS_SEND_HELLO_REQUEST` (`:681`, `:792`, `:1200`, `:1876`), a dedicated server state entered after cookie verification, with exponential-backoff resend (`:821`–`:837`). Cause of the error: a server-initiated HelloRequest *is* renegotiation in ordinary TLS, so the standard reading was applied to a transport that uses the message for something else. **Consequence: a hard S-track requirement** — the server must send a HelloRequest after verifying the cookie or the client stalls at `message_seq 1`. §12B, test #47. |
 | "Retail will show three cleartext ClientHellos and the reference two, the third being the HelloRequest-triggered renegotiation; do not mix it into the diff." — raised in session (T5, 2026-08-29) as a caution when building the Step 3 filter. | **WRONG — the reference shows three as well, and emits its own HelloRequest.** Both captures show the identical `0, 20, 0` cookie-length pattern across three ClientHellos plus a type-0 HelloRequest at the same position. The caution was harmless (pinning `frame.number` was still right) but its reasoning was the §12A renegotiation error inherited uncritically. Cause of the error: predicted a retail-only behaviour from a retail-only observation without asking whether the reference did it too — which is the exact question the reference build exists to answer (CHARTER §2). Test #47. |
 | "The HelloVerifyRequest is DTLS 1.0 (`fe ff`) … RFC 6347 §4.2.1: the server is stateless at that point and has not negotiated a version." — §9. | **NOT WRONG, BUT INCOMPLETE — and the real mechanism is more useful.** The RFC permits it, but the actual cause is that GridMate **hardcodes** `RecordHeader::m_version = DTLS1_VERSION` (`0xFEFF`) in its hand-packed records (`:308`, `:312`, `:343`). This moves the `fe ff` version from "OpenSSL/RFC default" into the **GridMate-controlled** bucket, where it matches retail exactly. **Diagnostic value:** every `fe ff` record in a capture is a GridMate hand-pack — exactly two per handshake (HelloVerifyRequest, HelloRequest). §9's advice not to chase it stands. §12B. |
+| "**Auth / server-list is a separate TCP/443 HTTPS phase to AWS** (`44.220.67.249` ×3, `13.217.79.62`, `18.238.35.71`)." — §12A, Transport named (T3, 2026-08-29). | **WRONG on all three hosts, and the error is the same one three times: AWS ownership inferred from IP, never checked against SNI.** By SNI: `44.220.67.249` is **kinesis telemetry**, `18.238.35.71` is **`d1hkbwzm1bktgo.cloudfront.net` (CDN)**, and `13.217.79.62` **appears nowhere in the T3 capture at all** — not in any ClientHello, not in `conv,tcp`. The `13.217.79.*` range *is* real and *is* auth-adjacent: it resolves to **`sts.us-east-1.amazonaws.com`** (P0, frame 485, host `13.217.79.90`). Cause of the error: "AWS-owned TCP/443 near login" was read as "the auth phase" without ever reading a server name. Same class as the `GameData.pak` and `assets/server/` rows. **Consequence:** the real auth host set is in §16.2, and `P0_PROMPT.md`'s Scope section inherits the wrong list and must be struck. §16. |
+| "**Start `tcpdump` while the game is fully quit, then launch.**" — §12A, capture procedure (T3), presented as the procedure that makes a capture good. | **NOT WRONG, BUT ITS SCOPE IS OVERSTATED — and that cost a session.** What the procedure guarantees is that the **world socket** opens inside the capture window, which is all T3 and T5 needed. It does **not** guarantee the **login phase** is inside the window: the T3 captures were started at world-load, so all three contain the DTLS handshake and **none** contains an auth exchange. A P0 session reading §12A would reasonably believe those captures were suitable; they were not. Evidence: across all three T3 pcaps, the only TLS ClientHellos preceding the world handshake are telemetry and config, and six streams totalling 54.9 MB pre-date the capture entirely. **Corrected procedure for auth-phase work:** sign out *inside the client*, quit the client **and Steam**, close other network applications, truncate the keylog, start `tcpdump` on `enp2s0`, then launch. §16.1. |
+| "Application data is probably **HTTP/2** and probably compressed; tell tshark so, rather than concluding the bodies are binary." — `P0_PROMPT.md`, Scope, written 2026-08-30 as a warning against a predicted failure mode. | **WRONG, and the warning caused the failure it was meant to prevent.** Every game auth flow is **HTTP/1.1** (`aws-sdk-cpp/1.7.193`). The `http2.*` filters built on this advice returned empty on 148 successful decrypts, which read as "no traffic" rather than "wrong dissector." Cause of the error: predicted the protocol from "modern AWS API" instead of reading ALPN or checking `_ws.col.Protocol`. **Lesson, and it generalises past this row: an empty tshark result is not a finding until `tls.debug_file` has been read.** §16.8. |
 
 ---
 
@@ -1558,6 +1571,11 @@ result — so no test is silently retried and no result is remembered wrong.
 | 47 | **T5** dump the full ordered handshake sequence with `message_seq`, both sides, to classify the third ClientHello. | Retail three hellos and a HelloRequest; reference two and none — i.e. §12A's renegotiation is retail-specific. | **Falsified — both sides identical: three hellos and a HelloRequest each.** Same types, same order, same `message_seq`. The third hello **resets to seq 0 with no cookie**, so it is the GridMate cookie handoff, not renegotiation. §12A corrected (§13). The HelloRequest is **byte-identical across retail and reference**, all 25 bytes — a GridMate hand-pack, and the single strongest structural-identity result in T5. Only structural difference: which oversized message fragments (retail SKE frames 8–9, ref Certificate frames 9–10), from the 958-vs-1380 cert sizes hitting PMTU. |
 | 48 | **T5 · P4** run `decode_carrier.py` over both epoch-0 flights. | Both parse through the same code path, no special-casing. | **Confirmed.** Retail 16/16 DTLS, 0 Carrier, **0 undecodable**. Reference 57 DTLS + 7 wakeup, 0 Carrier, **0 undecodable**. Same 13-byte `RecordHeader` / 12-byte `HandshakeHeader`, same type sequence. The §12A type-20 CCS gap did not arise (the extracted file stops before CCS) and **remains open**. |
 | 49 | **T5** `openssl s_client -dtls1_2 -connect 127.0.0.1:1` to confirm local 3.6.4 emits ext 65281 rather than SCSV. | Local hello shows 65281 and no SCSV, pinning the RFC 5746 difference on the library. | **Inconclusive, and unnecessary.** Port 1 refused (`write:errno=111`) before any ClientHello was emitted; nothing to inspect. Not retried: the reference capture **is** the 3.6.4 datapoint, and test #43 established GridMate never sets that field, so the bucket holds by construction. Recorded so it is not re-attempted. |
+| 50 | **P0 · Step 0** pair the keylog against the T3 pcaps: pull every `tls.handshake.type==1` random on TCP/443 and grep `nwly-keylog.txt` for each. | All randoms present — the T3 captures are valid P0 inputs. | **Confirmed for pairing, and the input was still wrong.** 14/15 randoms paired; the miss was `api.github.com` (a browser/git process, correctly absent from the client's keylog). But **no auth exchange exists in any T3 capture** — only two TLS ClientHellos precede the world handshake and both are telemetry/config. The captures were started at world-load. See §13. **`ls -la` is not a pairing test; the random-vs-keylog grep is.** |
+| 51 | **P0** exhaustive search of `p0_login` for the world address `35.71.190.194` / port `44727`: all exported HTTP objects and all decrypted records, as ASCII **and** as packed hex (`2347bec2`, `c2be4723`, `aeb7`, `b7ae`). Plus DNS for any query resolving to it. | Present somewhere if prediction 1 holds. | **Absent.** Zero hits except two `aeb7` byte-coincidences inside `.dds` textures. Zero DNS queries for the host or any game-related name. **Caveat that limits the result:** six TLS streams totalling 54.9 MB were unreadable because their handshakes pre-dated the capture. This is what motivated the cold re-capture (#52). |
+| 52 | **P0** cold re-capture: sign out in-client, quit client and Steam, close all other network applications, truncate keylog, `tcpdump -i enp2s0` **before** launch, then launch → character select → world. Capture `ss -tunp` at character select and in-world. | A login exchange finally inside the window, and every TLS stream with a captured handshake. | **Confirmed, and richer than predicted.** 8,943 frames, 0 dropped. 40 ClientHellos, full auth chain present (§16.2). Keylog 14,571 B. **Unplanned bonus:** the operator selected US West (refused) then US East (connected), producing a two-variant differential on the selection call (§16.4) that could not have been constructed deliberately without knowing the endpoint first. `ss -tunp` gave direct process attribution and settled in one command what three rounds of IP-prefix inference had not. |
+| 53 | **P0** locate the world-address handoff by ordering: find every request preceding the world DTLS ClientHello and identify which names the world. | A server-list response carrying an address, per prediction 1. | **Position confirmed, payload not read.** `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni` at **frame 2644**, response at **2648** (2,970 B), world ClientHello at **2716**. The world list at frame 1183 (`getlogininfo`) is **GUID-only with no address field of any kind** — so the address is not in the list, and 2648 is the only candidate left. |
+| 54 | **P0** decrypt frame 2648 (the queue response). | Decrypts — every other record on that host did. | **Falsified. `tls.debug`: `Cannot find master secret`.** TLS stream 33 carries **two sessions** on one TCP connection: random `896d329d…` **is** in the keylog (so the *requests* at 2514/2644 decrypt), random `f0c4bcf4…` has **0 hits**. Handshake at 2125–2135 is full, incl. NewSessionTicket (type 4). Hypothesis: **resumption — the keylog callback fires on full handshakes only.** Recorded as **OPEN-1** and **DEF-2**; owned by P0b. |
 
 ---
 
@@ -1569,6 +1587,14 @@ not yet used, and **gates** — undecided questions that block a chunk.
 
 An item leaves this table by being resolved with evidence, or by being handed to a
 chunk. It does not leave by being forgotten.
+
+> **FIND-1 closed 2026-08-30 — handed to P0, worked, findings in §16.** It said the
+> auth phase decrypts and that nobody had read the contents. It has now been read.
+> What it promised — "login → server-list → session token → the address and
+> credentials the world connect uses" — was delivered for the first three and
+> **not** for the address: the world list is GUID-only and the response that would
+> carry an address does not decrypt (**OPEN-1**). FIND-1 does not return to this
+> table; its unfinished remainder is OPEN-1 and OPEN-2.
 
 ### Gates
 
@@ -1601,13 +1627,21 @@ FIND-2 are the substitute for observing it.
 
 | ID | Defect | Owner | Notes |
 | -- | ------ | ----- | ----- |
+| **DEF-2** | **The `SSLKEYLOGFILE` keylog is NOT complete for every session on the client's general TLS context.** | **P0b.** | §12A established the callback is wired in; P0 established it nonetheless misses sessions. TLS stream 33 of `p0_cold` carries two sessions on one TCP connection; only one random appears in the keylog. Working hypothesis: the callback fires on **full handshakes only**, so resumed sessions are never logged. **CHARTER §4 in one line — a tool's cap is part of the measurement.** Any future chunk finding an empty result on a TLS flow must check `tls.debug_file` for `Cannot find master secret` before concluding anything about the client. Test #54, §16.7. |
 | **DEF-1** | `decode_carrier.py` has **no ChangeCipherSpec (content type 20) branch**. | **Unowned.** | Surfaced test #40 (part of the 19 undecodables), did not arise in test #48 because the extracted flight stops before CCS. Harmless today. CHARTER §4: a tool's cap is part of the measurement — an unhandled type will eventually be read as a finding about the client rather than a gap in the decoder. Small fix; worth doing before H3 output goes through it. |
+
+### Gates and blockers opened by P0
+
+| ID | Item | Blocks | Status |
+| -- | ---- | ------ | ------ |
+| **OPEN-1** | **The queue response (frame 2648 of `p0_cold`) does not decrypt.** It is the reply to the call that names the world, it precedes the world DTLS ClientHello by 68 frames, and it is the only remaining place the world address can be delivered. `tls.debug`: `Cannot find master secret`. | **S0 — its design, not merely its confidence.** | **OPEN.** Owned by **P0b**, a narrow re-capture aimed at forcing a full handshake on that connection so the key is logged. The exchange repeats on every login, so this is retryable — **but only until 31 Jan 2027 (§16.0).** |
+| **OPEN-2** | **`GUID2` in the selection path `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, channel. | S0 — a redirect must produce or echo it. | **OPEN.** Unowned. Cheap to attack from H2's static extraction as well as from capture. |
 
 ### Findings proven and not yet used
 
 | ID | Finding | Owner | Notes |
 | -- | ------- | ----- | ----- |
-| **FIND-1** | **The auth phase decrypts today.** `SSLKEYLOGFILE` is honoured by the client's general TLS context: the TCP/443 HTTPS auth/API traffic decrypts with no hook and no H-track dependency (§12A, test #41). The world DTLS stream does **not** — that gap is real and H3 remains required for it. | **Unowned.** | What has been proven is that it *decrypts*. **Nobody has read the contents.** S-track needs this flow eventually: login → server-list → session token → the address and credentials the world connect uses. It is the only part of the protocol readable right now, and it is independent of GATE-1. Candidate for its own chunk. |
+| **FIND-3** | **`Characters[].PublishedData`** — a base64, zlib-compressed (`eNr…`) blob per character in the `getlogininfo` response. Almost certainly server-published character state. | **Unowned.** | Decompresses without keys, from a response we can already read. Cheap, and it is server→client state in a readable form — the direction §15's work-order note says items 1–7 do *not* give us. Worth a small chunk. §16.3. |
 | **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. |
 
 ### Unverified, carried forward
@@ -1618,3 +1652,218 @@ FIND-2 are the substitute for observing it.
   Track S work a patch invalidates.
 - Epoch ≥ 1 Carrier framing on **retail** is inferred, not proven (§12B). H3's
   plaintext is what promotes it.
+
+---
+
+## 16. FINDINGS — P0 (auth-phase decode, TCP/443)
+
+Folded from the P0 session, 2026-08-30. Capture-only, no hooks, no injection, no
+client modification. Decryption is entirely from the keylog the client itself wrote
+via `SSLKEYLOGFILE` (§12A, test #41). CHARTER §3 satisfied.
+
+**Verdict: partial. The selection call and its position are identified; its response
+body is not readable from the captures in hand.** See "Prediction 1" and OPEN-1.
+
+### 16.0 Project clock — the servers are being retired
+
+The news payload served to the client (`/newsstories/STEAM_APP_ID.1063730/metadata.json`,
+CloudFront, read in the 2026-08-30 captures) carries Amazon's sunset notice:
+
+- **Servers go offline 31 January 2027.**
+- **Title delisted 15 January 2026** (already past).
+- Nighthaven season extended until shutdown.
+
+Amazon has wound the game down and the development team is gone. Two consequences
+for this project, and they cut in opposite directions:
+
+1. **Everything capture-dependent has a hard deadline.** P0, S0, and any future
+   observation of live retail traffic stop being possible on 31 Jan 2027. Captures
+   are a *perishable* input. Take more of them than seem necessary, and keep them.
+2. **Everything file-dependent does not.** H2 (static extraction), FIND-2 (protobuf
+   descriptors), D2's datasheets, and the reference build all operate on files that
+   sit on disk indefinitely. These are unaffected by the shutdown.
+
+This raises rather than lowers the priority of the whole S-track: after the retirement
+date a working private server is the *only* way the client runs at all. It also means
+the §15 work order should be read with capture-dependent items pulled earlier where
+that is cheap.
+
+### 16.1 Step 0 — which branch
+
+**Branch 1 for the T3-era pcaps** (all client randoms paired), but those captures
+proved to be the **wrong input** — see the correction in §13. Two new captures were
+taken this session:
+
+| Pcap | Keylog | Notes |
+| ---- | ------ | ----- |
+| `p0_login_b22469132_20260830-160722.pcap` | `nwly-keylog.txt` (truncated first, 6,286 B) | Client already running at capture start; six TLS streams pre-dated the window. |
+| `p0_cold_b22469132_20260830-170445.pcap` | `nwly-keylog.txt` (truncated first, 14,571 B) | **The good one.** Capture started before launch, everything but the game closed. |
+
+Prior keylogs preserved as `nwly-keylog-t3-20260829.txt` and
+`nwly-keylog-p0-20260830-160722.txt`. **A keylog only opens the launches it was
+written during; `SSLKEYLOGFILE` appends, so one file may cover several launches
+unless truncated.** The pairing test that actually works (not `ls -la`) is to pull
+each `tls.handshake.type==1` random from the pcap and grep the keylog for it.
+
+Also recorded: `p0_cold_sockets.txt`, two `ss -tunp` snapshots taken at character
+select and in-world. **Process attribution via `ss` should be step one of every
+future capture analysis** — it settled in one command what three rounds of IP-prefix
+guessing did not.
+
+### 16.2 The ordered auth sequence (from `p0_cold`, frames in order)
+
+All over TCP/443, HTTP/1.1 (**not** HTTP/2 — see the correction in §13),
+`aws-sdk-cpp/1.7.193`. EAC/EOS endpoints identified only to exclude them.
+
+| Frame | Host | Method / path | Role |
+| ----- | ---- | ------------- | ---- |
+| 164–241 | `dynamodb.{ap-southeast-2,sa-east-1,us-west-2,us-east-1,eu-central-1}` | `GET /ping` (**plaintext :80**) | Region latency probe. Responds `healthy: <host>`, 47 B. |
+| 255 | `api.epicgames.dev` | `POST /auth/v1/oauth/token` | EOS auth. **Excluded, CHARTER §3.** |
+| 283 | `tokenservice.amazongames.com` | `POST /games/new-world/tokens` | Issues the `x-nw-auth` JWT. |
+| 307/335 | `prod.identity-service.amazongames.com` | `POST /auth/platform/user/code` | Platform identity. |
+| 327 | `d2oeuvxi3kfsrw.cloudfront.net` | `GET /prod/credentials/omni` | Credential bootstrap. |
+| 380–469 | `ags-javelin-remote-config.s3` | `GET /applications/{public,publicGameplay}/configuration-sets/{ProductId,RegionId,CognitoId}/…` | Config fan-out. |
+| 397 | `prod.identity-service` | `POST /federated/identities/user` | Federated identity; repeats throughout. |
+| 485/531 | `sts.us-east-1.amazonaws.com` | `POST /` | **AWS STS.** Issues the `x-amz-security-token`. |
+| 529–589 | `client.entitlementservice.amazongames.com` | `GET/POST …/entitlements`, `…/entitlements/sync` | Ownership check. |
+| **1183** | `d2oeuvxi3kfsrw.cloudfront.net` | `GET /prod/game/getlogininfo/jwt/omni?channelId=…&includeNames=true` | **The world list.** 16,604 B. See 16.3. |
+| 1202 | `d1hkbwzm1bktgo.cloudfront.net` | `GET /motd/worlds_STEAM_APP_ID.1063730.json` | MOTD overlay, GUID-keyed. **Not** a server list. |
+| **2514** | `d2oeuvxi3kfsrw.cloudfront.net` | `POST /prod/game/login/queue/v2/jwt/omni?channelId=…&tokenVersion=10` | **Selection call, control variant.** See 16.4. |
+| **2644** | `d2oeuvxi3kfsrw.cloudfront.net` | `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni?tokenVersion=10` | **Selection call, world variant.** |
+| **2648** | ← `3.160.30.142` | 2,970-byte TLS ApplicationData response | **The handoff response. NOT READ — see OPEN-1.** |
+| **2716/2719/2722** | `35.71.190.194:24083` | DTLS ClientHello ×3 (GridMate cookie handoff, §12B) | World connection opens. |
+
+Continues after connect: catalog, privacy-settings, kinesis telemetry. None of it
+pre-dates the world handshake, so none of it is the handoff.
+
+### 16.3 The world list — GUID-only, no addresses
+
+`GET /prod/game/getlogininfo/jwt/omni` → `{"LoginInfoList":{"Worlds":[…],
+"RecommendedWorlds":[…],"Characters":[…],"NameReservations":[…]}}`.
+
+Per-world fields: `WorldId` (GUID), `WorldName`, `PublicName`, `WorldSet`,
+`WorldStatus`, `WorldType`, `WorldVersion`, `TransferToRegion`, `MaxAccountCharacters`,
+`ConnectionCount`, `MaxConnectionCount`, `IsFull`, `IsRecommended`, `IsSelectable`,
+and `WorldMetrics{QueueSize, QueueWaitTimeSec, WorldAgeDays, WorldPopulationStatus}`.
+
+**There is no address field of any kind.** No host, no port, no endpoint, no region
+URL. This is the finding that shapes S0.
+
+Structural notes worth keeping:
+
+- **One playable world remains: `PublicName` "Valhalla", `WorldName` `live-2-02-1`,
+  `WorldType: OpenWorld`, `WorldSet: CrossPlay`, `IsRecommended: true`.** Every other
+  `OpenWorld` entry has `WorldSet: transfer` and a name of the form
+  `retail-transfer-iad-prod-to-<region>-prod` — these are transfer stubs, not
+  playable. Also present: `WorldType: Tools` (`live-2-tools-1`) and `WorldType: Pool`
+  (`live-2-pool-1`).
+- **`WorldVersion` on Valhalla is a server build string** of the form
+  `JAVELIN_RC_<digits>_nw-rc-retail-ptch-<digits>_SERVER_LOOSE`. Relevant to S1a: it
+  names the server build the client expects to meet. Recorded as a *format*; the
+  live value is in the capture.
+- **This explains the failed US West selection** (see 16.4): the only `pdx-prod`
+  entry is a transfer stub, so there is nothing there to connect to.
+
+`Characters[]` and `NameReservations[]` carry per-character `CharacterId`,
+`WorldId`, timestamps, `LocationGroupId`/`LocationId`, and a base64 `PublishedData`
+blob (zlib-compressed, `eNr…` — an S-track lead: it is character state the server
+publishes). **Values redacted: character names, persona ID, character GUIDs.**
+
+### 16.4 The selection call — and a natural experiment
+
+The client made **two** queue POSTs on the same TLS connection, because the operator
+selected US West (refused), then US East (succeeded). This is the differential the
+chunk needed and it was unplanned.
+
+| | Frame 2514 — US West, refused | Frame 2644 — US East, connected |
+| - | ---- | ---- |
+| Path | `/prod/game/login/queue/v2/jwt/omni?channelId=STEAM_APP_ID.1063730&tokenVersion=10` | `/prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni?tokenVersion=10` |
+| Body | 680 B | 25 B |
+| Body shape | `{"LoginQueueRequest":{"CharacterId":<guid>,"ClientCapabilities":[],"IsTrialOwner":false,"SteamAppId":1063730,"SteamAuthTicket":<hex>,"WorldId":""}}` | `{"ClientCapabilities":[]}` |
+| World named | **`WorldId` empty**, absent from path | **In the path**, as `{WorldId}_{GUID2}` |
+| Region config fetched just before | `RegionId/pdx-prod`, Cognito id A | `RegionId/iad-prod`, Cognito id B |
+
+So: the world identifier moves **from the body to the URL path** between the generic
+and the specific call, and the second GUID in `{WorldId}_{GUID2}` is unidentified —
+candidate meanings are instance, shard, or channel. **Identifying `GUID2` is an S0
+prerequisite.**
+
+Request headers on both (structure only, values redacted):
+
+- `authorization: AWS4-HMAC-SHA256 Credential=<ASIA…>/<yyyymmdd>/us-east-1/execute-api/aws4_request, SignedHeaders=…, Signature=<hex>` — **SigV4 signed**, service `execute-api`.
+- `x-amz-security-token: <STS session token>` — from the STS call at frame 531.
+- `x-nw-auth: <RS256 JWT>` — from `tokenservice`. Claims include `iss` (tokenservice
+  issuer URL), `aud` (`amzn1.organizationId.prod.new-world`, `EOS.prod.new-world`),
+  `sub`/`az_persona_id` (persona id), `az_platform: steam`, `az_platform_id` (Steam
+  ID), `az_ags_identity`, `az_region`, `sid` (session id), `az_identities[]`, and
+  `exp`/`iat`/`nbf` — **4-hour lifetime observed**. `jku` points at a public JWKS
+  endpoint under `tokenservice.amazongames.com`.
+- `x-amz-content-sha256`, `x-amz-date`, `x-amz-api-version: 2017-09-26`.
+
+**S1a-relevant:** the world connection carries no visible token in the DTLS handshake
+(§12B), so whatever authorises the client to the world server is either issued in the
+frame-2648 response or carried in the first epoch-1 Carrier message. Unresolved.
+
+### 16.5 Predictions 1–4
+
+| # | Prediction | Result |
+| - | ---------- | ------ |
+| **1** *(load-bearing)* | The world address arrives in a decrypted auth response, at an earlier frame than the first UDP datagram to that host. | **UNRESOLVED, and the position test passes.** The response at **frame 2648** precedes the world ClientHello at **2716** by 68 frames and is the reply to the call that names the world. Its 2,970-byte body **does not decrypt** (OPEN-1). Separately **falsified in the strong form**: the address is *not* in any readable auth body — exhaustive search across all exported HTTP objects and decrypted records for `35.71.190.194` / `44727` / `24083` as ASCII **and** as packed hex (`2347bec2`, `aeb7`) returned nothing but two false hits inside `.dds` textures. |
+| **2** | JSON over HTTP/2, server list with an address or hostname per entry. | **Half right, half wrong.** JSON: yes. HTTP/2: **no — HTTP/1.1 throughout**, see §13. Server list with addresses: **no — GUID-only**, 16.3. |
+| **3** | A session token issued at login is carried into the world connection. | **Partly confirmed.** Tokens exist and are characterised (16.4). Their path into the world connection is **not** established; §12B shows no place for one in the DTLS handshake. Still open, now owned by S1a. |
+| **4** | Auth host set stable; world address not. | **Confirmed, and §12A corrected.** Same world **host** across captures a day apart (`35.71.190.194`) but a **different port each session** (`44727` → `24083`). T3's `52.223.16.88:54888` is a third, older value. §12A's "same IP:port on both captures" was true within one evening and does not generalise; its ephemeral-port warning referred to the **local** port. |
+
+### 16.6 What S0 must do — derived, not assumed
+
+1. **Do not plan a DNS or hosts-file redirect.** No DNS query resolves the world
+   host in any of five captures. The client is handed an address (or derives one)
+   without a name lookup, so `/etc/hosts` has nothing to catch.
+2. **The interception point is the queue response**, frame 2648's equivalent —
+   `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni`. Redirection means
+   answering that call, not intercepting a name.
+3. **Answering it requires reading it first.** OPEN-1 blocks S0's design, not merely
+   its confidence.
+4. **A local TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net` is the likely
+   S0 mechanism**, since the endpoint *is* DNS-resolvable even though the world host
+   is not. Certificate trust in a Wine prefix is the obvious obstacle and should be
+   scoped before committing.
+5. **SigV4 + STS + JWT all sign the request.** A replayed or hand-built queue POST
+   must satisfy whatever the server checks. If S0 proxies rather than forges, this
+   is moot — another argument for the proxy shape.
+
+### 16.7 New open items (mirrored into §15)
+
+- **OPEN-1 — frame 2648 does not decrypt.** `tls.debug` reports **`Cannot find
+  master secret`**. TLS stream 33 carries **two sessions** on one TCP connection:
+  random `896d329d…` has a keylog entry (which is why the *requests* at 2514/2644
+  decrypt), random `f0c4bcf4…` has **zero**. The handshake at frames 2125–2135 is a
+  full one including NewSessionTicket (type 4). Working hypothesis: **session
+  resumption — OpenSSL's keylog callback fires on full handshakes, so a resumed
+  session's secret is never written.** Testable, and the exchange repeats every
+  login. Owner: **P0b**, a narrow re-capture.
+- **DEF-2 — the keylog is not complete for every session on the general TLS
+  context.** §12A established that the callback *is* wired in; this session
+  establishes that it nonetheless misses sessions. A future chunk that finds an
+  empty result on a TLS flow must check `tls.debug` for `Cannot find master secret`
+  before concluding anything about the client.
+- **`GUID2` in `{WorldId}_{GUID2}` is unidentified.** Blocks S0.
+- **`PublishedData` (base64 zlib, `eNr…`) in `Characters[]` is unexamined.** Likely
+  server-published character state — an S-track lead.
+
+### 16.8 Instrument lessons (CHARTER §4 — a tool's cap is part of the measurement)
+
+Four filter mistakes cost real time this session and each produced an *empty result
+that looked like a finding*:
+
+1. `http2.*` filters on a connection that is **HTTP/1.1** — returned nothing, which
+   read as "no traffic."
+2. `tls.app_data` is the **encrypted** record payload; grepping it for plaintext
+   tests nothing.
+3. `tcp.stream` and `tls.stream` are **different indexes**; `follow,tls` takes the
+   latter. Feeding it a TCP index returns an empty follow.
+4. `follow,tls` silently omits records it cannot decrypt, so an incomplete follow
+   can mean *missing keys* rather than *end of conversation*.
+
+**Rule for future chunks: on any empty tshark result, check `tls.debug_file` before
+believing it.** That is the same check test #41 used correctly and that these four
+mistakes each skipped.
