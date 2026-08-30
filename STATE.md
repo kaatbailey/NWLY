@@ -5,10 +5,10 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-30** |
-| Written against commit | 3e1e72e |
+| Written against commit | use command then paste at end, git rev-parse --short HEAD`|  3a964cd |
 | Section count (every `## ` header, this one included) | **18** |
 | Highest test number (§14) | **49** |
-| Highest correction row (§13) | 8 |
+| Correction row count (§13) | **19** |
 | Chunks complete | T1, T2, T3, T4, T5, D2 |
 | Open gates | **0** — GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
 
@@ -17,10 +17,31 @@ read on, not to propose anything:
 
 ```fish
 cd ~/Documents/NWLY; and git pull
-grep -c '^## ' STATE.md          # expect 17
-grep -oP '^\| \d+ ' STATE.md | tail -1   # expect 49
+grep -c '^## ' STATE.md                                                    # expect 18
+awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 49
+awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
+  | grep -vc '^| Old claim\|^| ---'                                        # expect 19
 git log -1 --format='%h %ad %s' origin/Master
 ```
+
+> **Header repaired 2026-08-30 (pre-P0).** Three of the four checks were wrong and
+> a session obeying §6.2 would have halted at step zero on a false alarm — or, worse,
+> learned to wave mismatches through, which is the one thing this mechanism cannot
+> survive. Corrected, with the original claim recorded per §5:
+> - `# expect 17` contradicted the header's own `18`; the true count is **18**.
+> - `grep -oP '^\| \d+ '` matched any table row opening with a bare number, so it
+>   returned **8** (a §13/§15 row), not 49. Now anchored to §14.
+> - `Highest correction row (§13) | 8` was false — §13 holds **19** rows, and they
+>   carry no IDs, so the field was unverifiable as written. It is now a **count**.
+>   Numbering the existing rows would be a reorder, which §5 forbids.
+> - `Written against commit` was **blank**, i.e. one of the four numbers §6.2
+>   requires did not exist. Fill it before this file is pushed.
+>
+> **Consequence for citations:** §13's rows are unnumbered and append-only, so every
+> insertion shifts positional references. `P0_PROMPT.md` cited "§13 row 7" for the
+> `SSLKEYLOGFILE` overcall; that is **row 15**, and row 7 is the unrelated
+> `AllocatorInstance` correction. **Cite §13 rows by their opening claim text, never
+> by index.**
 
 **A mismatch means stop and resolve it. It does not mean proceed carefully.** On
 2026-08-29 a session ran to completion against a three-day-old copy of this file

@@ -33,7 +33,12 @@ It does **not** decrypt the DTLS world stream — GridMate's `SecureSocketDriver
 builds its `SSL_CTX` separately and never calls `SSL_CTX_set_keylog_callback`
 (§12B, confirmed in source). That gap is real, it is not this chunk's problem, and
 **do not try to close it here.** A prior session overcalled exactly this and it is
-correction row 7 in §13.
+the §13 correction opening *"`SSLKEYLOGFILE` is honoured, so the client's decrypted
+stream is readable from a file with no hook"* (T3, 2026-08-29).
+~~correction row 7 in §13~~ — **wrong pointer, corrected 2026-08-30.** That is row
+**15**; row 7 is the unrelated `AllocatorInstance` correction. §13 is unnumbered and
+append-only, so every insertion shifts positional references: **cite by claim text,
+never by index.**
 
 Nothing is injected, patched or modified. We read a file the client produced.
 
@@ -41,27 +46,65 @@ Nothing is injected, patched or modified. We read a file the client produced.
 
 ## Step 0 — confirm the inputs exist before doing anything else
 
-The keylog was written to a path set via Steam launch options, and the captures live
-in the repo. Both predate this session. **Check, do not assume:**
+The keylog was written to a path set via Steam launch options. ~~The captures live
+in the repo.~~ **WRONG — corrected 2026-08-30 at the console.** Retail captures live
+at **`~/Documents/nwly-captures/`**, deliberately *outside* the repo (§5, "Capture
+output"). A glob against `~/Documents/NWLY/*.pcap` matches nothing, and fish aborts
+the whole command substitution on a failed glob rather than returning empty — which
+is §5's third gotcha, and the reason the check below uses `find`.
+
+Both inputs predate this session. **Check, do not assume:**
 
 ```fish
-ls -la /home/kaatlev/nwly-keylog.txt
-cd ~/Documents/NWLY; and ls -la *.pcap
+set -g KEY /home/kaatlev/nwly-keylog.txt
+find /home/kaatlev -maxdepth 1 -name 'nwly-keylog.txt' -printf '%p  %s bytes\n'
+find ~/Documents/nwly-captures -name '*.pcap' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-
+set -g PCAP ~/Documents/nwly-captures/t3_retail_b22469132_20260829-203901.pcap
 ```
 
-- **Keylog present and the pcap contains TCP/443 to AWS** → proceed to Step 1.
-- **Keylog missing or empty** → re-capture. One launch, `SSLKEYLOGFILE` set via the
-  Steam launch option (`SSLKEYLOGFILE=/home/kaatlev/nwly-keylog.txt %command%`),
-  **tcpdump started before the client**, reach character-select/server-list, then
-  reach the world. You need the whole login sequence, not a mid-session slice.
-- **Pcap has no TCP/443, or the capture began after login** → re-capture likewise.
-  A capture that starts after auth has already happened contains nothing this chunk
-  needs.
+`t3_retail_b22469132_20260829-203901.pcap` is the named good capture (§5, §12A,
+test #37) — the one whose tcpdump started before launch. `t3_handshake_epoch0.pcap`
+is a **world-stream extract** and is not this chunk's input.
+
+**Existence is not the test.** A non-empty keylog proves nothing about whether its
+keys open *this* pcap. Run the pairing check that test #41 already used on the world
+stream, pointed at TCP/443 — one line, no continuations:
+
+```fish
+for r in (tshark -r $PCAP -Y 'tcp.port==443 && tls.handshake.type==1' -T fields -e tls.handshake.random | tr -d ':' | sort -u)
+    echo -n "$r  keylog hits: "; grep -c $r $KEY
+end
+```
+
+Grep the **bare random**, not the `CLIENT_RANDOM ` prefix — the keylog also carries
+TLS 1.3 `*_TRAFFIC_SECRET_0` lines keyed on the same field, and matching the prefix
+would miss them. **`grep -c` exits 1 on a zero count** (§5 gotcha, test #22), so fish
+reports a failure on the "absent" result; the number is the answer, not the exit
+status.
+
+- **Every random has ≥1 hit** → the keys open this capture. Proceed to Step 1.
+  **This is the expected branch:** test #41 reports `dissect_ssl_payload decrypted`
+  on the TCP/443 flows of this same pcap, so the pairing is already proven. If the
+  check disagrees, something changed since 2026-08-29 — **say so before proceeding**
+  (CHARTER §6.3), do not quietly re-capture.
+- **Some hit, some do not** → the pcap spans launches the keylog does not cover, or
+  the file was truncated. Work the sessions that decrypt; do not re-capture yet.
+- **Zero hits, or no `tls.handshake.type==1` on port 443 at all** → re-capture. One
+  launch, `SSLKEYLOGFILE` set via the Steam launch option
+  (`SSLKEYLOGFILE=/home/kaatlev/nwly-keylog.txt %command%`), **tcpdump started
+  before the client** on `enp2s0` (§5 — not `-i any`, which yields SLL framing),
+  reach character-select/server-list, then reach the world. You need the whole login
+  sequence, not a mid-session slice. A capture that starts after auth has already
+  happened contains nothing this chunk needs.
 
 **Record which of these three you were in.** If a re-capture was needed, that is a
-new test-log row and a new build/keylog pairing — the keys only decrypt the sessions
-they were captured with, so a keylog from one launch will not open a pcap from
-another.
+new test-log row and a new build/keylog pairing.
+
+**One correction to the pairing trap:** `SSLKEYLOGFILE` opens the file in **append**
+mode, so unless it was truncated a single keylog can hold keys from several launches.
+The constraint is **per-session, not per-file** — the check above tests exactly the
+right thing, and "one keylog, one launch" would send you re-capturing when you did
+not need to.
 
 ---
 
@@ -79,7 +122,7 @@ bodies are binary.
 Suggested starting point — adapt rather than copy blindly:
 
 ```fish
-set PCAP (ls -t ~/Documents/NWLY/*.pcap | head -1)
+# $PCAP is already set from Step 0. Do not re-derive it with a glob.
 tshark -r $PCAP \
   -o tls.keylog_file:/home/kaatlev/nwly-keylog.txt \
   -o tls.debug_file:/tmp/p0_tlsdbg.txt \
@@ -108,8 +151,14 @@ which fields carry identifiers that reappear later.
    connection somehow — and the DTLS handshake (§12B) has no obvious place for it,
    which means it is either in the first epoch-1 Carrier message or in a field we
    have not looked at.
-4. The auth host set is **stable across sessions**; the world server address is
-   **not** (§12A already warns the port is ephemeral).
+4. The auth host set is **stable across sessions**. Whether the **world server
+   address** is stable is genuinely open, and ~~§12A already warns the port is
+   ephemeral~~ **misreads §12A — corrected 2026-08-30.** §12A's ephemeral-port
+   warning is about the **local** port (`27001`, "do not hardcode"); about the
+   *server* it says the opposite — `52.223.16.88:54888`, **"Same IP:port on both of
+   the day's captures."** So the only two datapoints in hand point at *stability*.
+   State which you expect and why before looking; predicting instability here is
+   predicting against the evidence, and §13 is largely rows of exactly that.
 
 **Prediction 1 is the load-bearing one and it has a sharp test:** the auth response
 naming the world host must appear at an *earlier frame number* than the first UDP
@@ -150,6 +199,10 @@ design depends on which it is.
   Record *structure* — field names, formats, lengths, where a value flows — never
   the secret itself. These are live credentials for your own account and the
   documents are in a git repo. Note the shape, redact the value.
+  **This is a change of practice, not a reminder.** §12A pastes a DTLS cookie
+  (`eb14bc1b…`) and a client random verbatim. Those are non-secret and need no
+  correction — but a session copying that house style will reach for hex without
+  thinking, and the auth phase carries values where that is not free.
 - No client modification of any kind.
 
 ---
@@ -157,7 +210,10 @@ design depends on which it is.
 ## FINDINGS to record
 
 Fold into a new `## 16` section in `STATE.md` (§15 is the register; check the
-freshness header's section count and update it). Include:
+freshness header's section count and update it). Adding `## 16` takes the count
+**18 → 19**; update the header field **and** the `# expect` comment together — they
+disagreed with each other before this chunk, which is precisely the failure §6.2
+exists to catch. Include:
 
 - Which Step 0 branch you were in, and if re-captured: new pcap filename, keylog
   path, build id, and the fact that keylog and pcap must be from the same launch.
