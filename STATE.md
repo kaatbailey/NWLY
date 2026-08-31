@@ -5,7 +5,7 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-31** |
-| Written against commit | **FILL ON COMMIT** — prior value `2b0c5fc` was stale (HEAD was `6eea228` on 2026-08-31; the field lagged the content, which was byte-current). Set this to the commit that carries these S0a edits. |
+| Written against commit | a2d2fcd |
 | Section count (every `## ` header, this one included) | **19** (§16.15 is a `###` subsection, not a new `## `) |
 | Highest test number (§14) | **62** |
 | Correction row count (§13) | **28** |
