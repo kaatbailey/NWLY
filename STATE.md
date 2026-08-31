@@ -5,12 +5,12 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-30** |
-| Written against commit | f299645 |
+| Written against commit | **FILL BEFORE PUSH** — `git rev-parse --short HEAD` after committing this update |
 | Section count (every `## ` header, this one included) | **19** |
-| Highest test number (§14) | **54** |
-| Correction row count (§13) | **22** |
-| Chunks complete | T1, T2, T3, T4, T5, D2 |
-| Open gates | **0** — GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
+| Highest test number (§14) | **59** |
+| Correction row count (§13) | **26** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, **P0, P0b** |
+| Open gates | **1** — **OPEN-3** (does the client validate `Token.Signature`?), §15. GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
 
 **A session's first action is to check these against the working tree.** Not to
 read on, not to propose anything:
@@ -18,9 +18,9 @@ read on, not to propose anything:
 ```fish
 cd ~/Documents/NWLY; and git pull
 grep -c '^## ' STATE.md                                                    # expect 19
-awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 54
+awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 59
 awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
-  | grep -vc '^| Old claim\|^| ---'                                        # expect 22
+  | grep -vc '^| Old claim\|^| ---'                                        # expect 26
 git log -1 --format='%h %ad %s' origin/Master
 ```
 
@@ -1512,6 +1512,10 @@ claim adds a row here rather than deleting the claim.
 | "**Auth / server-list is a separate TCP/443 HTTPS phase to AWS** (`44.220.67.249` ×3, `13.217.79.62`, `18.238.35.71`)." — §12A, Transport named (T3, 2026-08-29). | **WRONG on all three hosts, and the error is the same one three times: AWS ownership inferred from IP, never checked against SNI.** By SNI: `44.220.67.249` is **kinesis telemetry**, `18.238.35.71` is **`d1hkbwzm1bktgo.cloudfront.net` (CDN)**, and `13.217.79.62` **appears nowhere in the T3 capture at all** — not in any ClientHello, not in `conv,tcp`. The `13.217.79.*` range *is* real and *is* auth-adjacent: it resolves to **`sts.us-east-1.amazonaws.com`** (P0, frame 485, host `13.217.79.90`). Cause of the error: "AWS-owned TCP/443 near login" was read as "the auth phase" without ever reading a server name. Same class as the `GameData.pak` and `assets/server/` rows. **Consequence:** the real auth host set is in §16.2, and `P0_PROMPT.md`'s Scope section inherits the wrong list and must be struck. §16. |
 | "**Start `tcpdump` while the game is fully quit, then launch.**" — §12A, capture procedure (T3), presented as the procedure that makes a capture good. | **NOT WRONG, BUT ITS SCOPE IS OVERSTATED — and that cost a session.** What the procedure guarantees is that the **world socket** opens inside the capture window, which is all T3 and T5 needed. It does **not** guarantee the **login phase** is inside the window: the T3 captures were started at world-load, so all three contain the DTLS handshake and **none** contains an auth exchange. A P0 session reading §12A would reasonably believe those captures were suitable; they were not. Evidence: across all three T3 pcaps, the only TLS ClientHellos preceding the world handshake are telemetry and config, and six streams totalling 54.9 MB pre-date the capture entirely. **Corrected procedure for auth-phase work:** sign out *inside the client*, quit the client **and Steam**, close other network applications, truncate the keylog, start `tcpdump` on `enp2s0`, then launch. §16.1. |
 | "Application data is probably **HTTP/2** and probably compressed; tell tshark so, rather than concluding the bodies are binary." — `P0_PROMPT.md`, Scope, written 2026-08-30 as a warning against a predicted failure mode. | **WRONG, and the warning caused the failure it was meant to prevent.** Every game auth flow is **HTTP/1.1** (`aws-sdk-cpp/1.7.193`). The `http2.*` filters built on this advice returned empty on 148 successful decrypts, which read as "no traffic" rather than "wrong dissector." Cause of the error: predicted the protocol from "modern AWS API" instead of reading ALPN or checking `_ws.col.Protocol`. **Lesson, and it generalises past this row: an empty tshark result is not a finding until `tls.debug_file` has been read.** §16.8. |
+| "The address will most likely be **split across fields rather than as `ip:port` in one string** — so grep both halves independently, and don't conclude from a failed search on the joined form." — raised in session (P0b, 2026-08-30) as a caution before reading the queue response. | **WRONG, and backwards.** `Token.RepAddress` is exactly the joined form: `"35.71.190.194:44727"` — one string, one field, colon-separated. Cause of the error: generalised from the `getlogininfo` world list's field-per-attribute style (§16.3) to a response that had never been read. The caution was harmless in practice — the searches run were independent anyway — but it is the same class as the `http2` row above: predicting a format from an adjacent format instead of reading it. §16.10, test #56. |
+| "**`GUID2` in `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, or channel." — §16.7 / OPEN-2 (P0, 2026-08-30). | **ALL THREE CANDIDATES WRONG.** `GUID2` is the **queue ticket id**: `Token.TicketId == GUID2`, and the outer `TicketId` is literally `"{WorldId}_{GUID2}"`. It is **minted by the server** in the enqueue response (frame 1586 of `p0b`) and echoed back by the client on redemption, so it is not a client-supplied parameter at all. A `CharacterId` hypothesis raised at the start of the P0b session was also falsified (`Token.CharacterId != GUID2`). Cause of the error: the candidate list was drawn from what a *world-selection* parameter could plausibly mean, without considering that the endpoint is a **queue** and the segment might identify the queue entry. §16.12, test #57. |
+| "Same world **host** across captures a day apart but a **different port each session** (`44727` → `24083`)." — §16.5, prediction 4 (P0, 2026-08-30). | **THE PORT CLAIM IS WRONG AS STATED.** P0b observed `35.71.190.194:`**`44727`** again — the same port as `p0_login`, a day later, across a full Steam re-login and a cold launch. Three datapoints now read `44727` → `24083` → `44727`, which is not per-session assignment; it looks like a small set of listeners the client is dealt from. Cause of the error: two datapoints that happened to differ were read as a per-session *rule* rather than as two draws from an unknown distribution. **Consequence: none for S0** — the address is delivered explicitly in `Token.RepAddress` either way, so its stability was never load-bearing. Recorded because §12A was corrected on the strength of this claim. §16.10. |
+| "Separately **falsified in the strong form**: the address is *not* in any readable auth body — exhaustive search across all exported HTTP objects and decrypted records … returned nothing but two false hits inside `.dds` textures." — §16.5, prediction 1 (P0, 2026-08-30). | **TRUE AS SCOPED, SUPERSEDED AS PHRASED.** The search was exhaustive over the bodies readable *at that time*, and the one body that carries the address was precisely the one that did not decrypt. P0b decrypted it; the address is there, in plaintext ASCII, as `Token.RepAddress`. This row is not an error — the scope qualifier was doing real work — but the phrase "not in any readable auth body" invites the wrong generalisation on re-reading, and **prediction 1 is now CONFIRMED** (§16.10, §16.14). Lesson, and it is §16.8 from the other direction: an exhaustive search is bounded by what the instrument could open, and that bound belongs **inside the sentence**, not in a caveat elsewhere. |
 
 ---
 
@@ -1576,6 +1580,11 @@ result — so no test is silently retried and no result is remembered wrong.
 | 52 | **P0** cold re-capture: sign out in-client, quit client and Steam, close all other network applications, truncate keylog, `tcpdump -i enp2s0` **before** launch, then launch → character select → world. Capture `ss -tunp` at character select and in-world. | A login exchange finally inside the window, and every TLS stream with a captured handshake. | **Confirmed, and richer than predicted.** 8,943 frames, 0 dropped. 40 ClientHellos, full auth chain present (§16.2). Keylog 14,571 B. **Unplanned bonus:** the operator selected US West (refused) then US East (connected), producing a two-variant differential on the selection call (§16.4) that could not have been constructed deliberately without knowing the endpoint first. `ss -tunp` gave direct process attribution and settled in one command what three rounds of IP-prefix inference had not. |
 | 53 | **P0** locate the world-address handoff by ordering: find every request preceding the world DTLS ClientHello and identify which names the world. | A server-list response carrying an address, per prediction 1. | **Position confirmed, payload not read.** `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni` at **frame 2644**, response at **2648** (2,970 B), world ClientHello at **2716**. The world list at frame 1183 (`getlogininfo`) is **GUID-only with no address field of any kind** — so the address is not in the list, and 2648 is the only candidate left. |
 | 54 | **P0** decrypt frame 2648 (the queue response). | Decrypts — every other record on that host did. | **Falsified. `tls.debug`: `Cannot find master secret`.** TLS stream 33 carries **two sessions** on one TCP connection: random `896d329d…` **is** in the keylog (so the *requests* at 2514/2644 decrypt), random `f0c4bcf4…` has **0 hits**. Handshake at 2125–2135 is full, incl. NewSessionTicket (type 4). Hypothesis: **resumption — the keylog callback fires on full handshakes only.** Recorded as **OPEN-1** and **DEF-2**; owned by P0b. |
+| 55 | **P0b · Step 1** cold launch (Steam logged out and back in, tcpdump on `enp2s0` before launch), then check the queue TLS stream for a Certificate (handshake type 11) and pair its client random against the keylog. | Full handshake, key logged — clearing the resumption that produced OPEN-1. | **Confirmed.** `p0b_b22469132_20260830-181911.pcap`, 5,187 frames. TLS stream 10 (`d2oeuvxi3kfsrw.cloudfront.net`): ClientHello 480, ServerHello 485, **Certificate 487**, SKE/SHD 489, CKE/CCS 491, NewSessionTicket 505. One ClientHello, one random, **1 keylog hit** (keylog 6,110 B). `tls.debug`: **295 decrypted records**, 2 `Cannot find master secret`, neither on stream 10. §16.9. |
+| 56 | **P0b · Step 2** search every object from `--export-objects http` for the world host `35.71.190.194`, then locate the carrying body by frame with `http.file_data contains`. | The address appears in the queue response, at a frame earlier than the first world DTLS ClientHello. | **Confirmed, and exclusively.** `grep -rl` returns **exactly one** of 20+ exported objects: the 2,571-byte ticket-redeem reply, **frame 1660**, HTTP 200. First DTLS ClientHello to `35.71.190.194:44727` at **frame 1723** — 63 frames of margin. The 16,645-byte `getlogininfo` world list does **not** contain it, corroborating §16.3. Field is **`LoginQueueResponse.Token.RepAddress`**, a literal `"ip:port"` string. **Prediction 1 confirmed.** §16.10. |
+| 57 | **P0b** compare `GUID2` against `Token.TicketId`, `Token.CharacterId`, `Token.WorldId`, and the outer `TicketId` against `"{WorldId}_{GUID2}"`. | Session hypothesis: `GUID2` is the `CharacterId`, moved from body to path the way `WorldId` was (§16.4). | **Falsified, and OPEN-2 closed by the same run.** `Token.CharacterId == GUID2` → False. `Token.TicketId == GUID2` → **True**; outer `TicketId == "{WorldId}_{GUID2}"` → **True**; `Token.WorldId == WorldId` → True. `GUID2` is the **queue ticket id**. §16.12. |
+| 58 | **P0b** `HostHash` preimage sweep: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, then SHA-256 over all ordered pairs of those with separators `""`, `":"`, `"_"`, `"|"`. | `HostHash` is a SHA-256 of `RepAddress` or one of its components. | **Falsified. Zero hits.** 44 base64 chars → exactly **32 bytes**, so the length is right for SHA-256, but no tested preimage matches. Salted, HMAC'd with a server key, computed over a field not present in this response, or not a digest of the address at all. **Left unresolved deliberately** — its weight depends entirely on OPEN-3. Recorded as **FIND-4** so it is not re-swept blind. §16.12. |
+| 59 | **P0b** read the 214-byte reply to the *generic* queue POST (frame 1586), which `--export-objects` did not write out (no exported object is under 1 KB); read it by frame instead via `http.file_data`. | It hands back the ticket id that the second call addresses. | **Confirmed, and it revealed the poll loop.** Body carries `TicketId`, `AllowQueueTransfer`, `EstimatedTime: 3`, `Position: 0`, `RefreshInterval: 2`, `QueueName: "DEFAULT000"` — and **no `Token` and no address**. So the two-call sequence is **enqueue-then-redeem**, not P0's reading of refused-then-accepted (§16.4), and a *queued* world would have the client poll the ticket path every `RefreshInterval` seconds until a `Token` appears. Changes what S0 must answer. §16.11. |
 
 ---
 
@@ -1627,21 +1636,23 @@ FIND-2 are the substitute for observing it.
 
 | ID | Defect | Owner | Notes |
 | -- | ------ | ----- | ----- |
-| **DEF-2** | **The `SSLKEYLOGFILE` keylog is NOT complete for every session on the client's general TLS context.** | **P0b.** | §12A established the callback is wired in; P0 established it nonetheless misses sessions. TLS stream 33 of `p0_cold` carries two sessions on one TCP connection; only one random appears in the keylog. Working hypothesis: the callback fires on **full handshakes only**, so resumed sessions are never logged. **CHARTER §4 in one line — a tool's cap is part of the measurement.** Any future chunk finding an empty result on a TLS flow must check `tls.debug_file` for `Cannot find master secret` before concluding anything about the client. Test #54, §16.7. |
+| **DEF-2** | **The `SSLKEYLOGFILE` keylog is NOT complete for every session on the client's general TLS context.** | ~~**P0b.**~~ **Unowned — workaround in hand.** | §12A established the callback is wired in; P0 established it nonetheless misses sessions. TLS stream 33 of `p0_cold` carries two sessions on one TCP connection; only one random appears in the keylog. Working hypothesis: the callback fires on **full handshakes only**, so resumed sessions are never logged. **CHARTER §4 in one line — a tool's cap is part of the measurement.** Any future chunk finding an empty result on a TLS flow must check `tls.debug_file` for `Cannot find master secret` before concluding anything about the client. Test #54, §16.7. **REFINED 2026-08-30 by P0b: operationally solved, mechanism still a hypothesis.** A cold launch produces a full handshake on the queue stream and a logged key — the workaround works, and it is now the standing procedure for any auth-phase capture (§16.9). But P0b's capture contains **no resumed game session**, so "the callback fires on full handshakes only" has one consistent observation and no direct test. The two remaining `Cannot find master secret` records are attributed to EOS and IntelliJ streams **by session-id correlation, not by direct evidence**. §16.8's rule stands unchanged. Tests #55, #59. |
 | **DEF-1** | `decode_carrier.py` has **no ChangeCipherSpec (content type 20) branch**. | **Unowned.** | Surfaced test #40 (part of the 19 undecodables), did not arise in test #48 because the extracted flight stops before CCS. Harmless today. CHARTER §4: a tool's cap is part of the measurement — an unhandled type will eventually be read as a finding about the client rather than a gap in the decoder. Small fix; worth doing before H3 output goes through it. |
 
 ### Gates and blockers opened by P0
 
 | ID | Item | Blocks | Status |
 | -- | ---- | ------ | ------ |
-| **OPEN-1** | **The queue response (frame 2648 of `p0_cold`) does not decrypt.** It is the reply to the call that names the world, it precedes the world DTLS ClientHello by 68 frames, and it is the only remaining place the world address can be delivered. `tls.debug`: `Cannot find master secret`. | **S0 — its design, not merely its confidence.** | **OPEN.** Owned by **P0b**, a narrow re-capture aimed at forcing a full handshake on that connection so the key is logged. The exchange repeats on every login, so this is retryable — **but only until 31 Jan 2027 (§16.0).** |
-| **OPEN-2** | **`GUID2` in the selection path `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, channel. | S0 — a redirect must produce or echo it. | **OPEN.** Unowned. Cheap to attack from H2's static extraction as well as from capture. |
+| ~~**OPEN-1**~~ **CLOSED** | ~~**The queue response (frame 2648 of `p0_cold`) does not decrypt.**~~ It is the reply to the call that names the world, it precedes the world DTLS ClientHello by 68 frames, and it is the only remaining place the world address can be delivered. `tls.debug`: `Cannot find master secret`. | **S0 — its design, not merely its confidence.** | **CLOSED 2026-08-30 by P0b.** A cold launch (Steam logged out and back in) forced a **full** handshake on the queue stream; the key was logged and the body decrypted. The world address is **`LoginQueueResponse.Token.RepAddress`**, a literal `"ip:port"` string, at frame 1660 — 63 frames before the client's first DTLS ClientHello to that host:port, and present in **exactly one** of 20+ exported objects. **S0 is unblocked.** §16.9, §16.10; tests #55, #56. |
+| ~~**OPEN-2**~~ **CLOSED** | ~~**`GUID2` in the selection path `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, channel.~~ | S0 — a redirect must produce or echo it. | **CLOSED 2026-08-30 by P0b. All three candidates were wrong.** `GUID2` is the **queue ticket id** (`Token.TicketId == GUID2`; outer `TicketId == "{WorldId}_{GUID2}"`). It is **server-minted** in the enqueue response and echoed back by the client on redemption — so a redirect does not have to *produce* it, only echo what it issued. §16.12, test #57, §13. |
+| **OPEN-3** | **Does the client validate `Token.Signature` (RSA-2048, 256 bytes) or `Token.HostHash` (32 bytes) before dialling `Token.RepAddress`?** | **S0's design shape** — not merely its confidence. | **OPEN, and it is the project's only live gate.** Owner: **S0a** (static, in Ghidra — cheapest route, and it warms the project H2 needs anyway), with an empirical fallback inside S0. The world server is the natural verifier of that signature, and under S0/S1a the world server is **us** — so the signature only bites if the *client* checks it. If it does, a proxy that rewrites `RepAddress` breaks the signature and S0 needs a different mechanism. **Answer this before S0 commits to a design.** §16.12, §16.13. |
 
 ### Findings proven and not yet used
 
 | ID | Finding | Owner | Notes |
 | -- | ------- | ----- | ----- |
 | **FIND-3** | **`Characters[].PublishedData`** — a base64, zlib-compressed (`eNr…`) blob per character in the `getlogininfo` response. Almost certainly server-published character state. | **Unowned.** | Decompresses without keys, from a response we can already read. Cheap, and it is server→client state in a readable form — the direction §15's work-order note says items 1–7 do *not* give us. Worth a small chunk. §16.3. |
+| **FIND-4** | **`Token.HostHash`** — 32 bytes, base64, in every login-queue response. **Not** a digest of any field tested: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, and SHA-256 over all ordered pairs with four separators, all returned zero (test #58). | **Unowned.** | Low priority **by itself**; it matters only if OPEN-3 resolves toward client-side validation. **Do not chase open-endedly** — the sweep already run is recorded so it is not repeated blind. §16.12. |
 | **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. |
 
 ### Unverified, carried forward
@@ -1877,3 +1888,209 @@ that looked like a finding*:
 **Rule for future chunks: on any empty tshark result, check `tls.debug_file` before
 believing it.** That is the same check test #41 used correctly and that these four
 mistakes each skipped.
+
+### 16.9 P0b — the capture, and the gate it had to pass
+
+`p0b_b22469132_20260830-181911.pcap`, **5,187 frames**, `enp2s0`, tcpdump started
+before launch. Keylog `nwly-keylog.txt`, **6,110 B**. Cold launch by the third and
+heaviest method P0b offered: **Steam logged out and back in**. The two cheaper
+escalations (quit-and-wait, quit Steam so `wineserver` exits) were **never tested** —
+the sledgehammer worked first try, so nothing is known about whether they suffice.
+
+Short session: character select → Valhalla → a brief run → logout.
+
+**The gate P0b existed to pass, passed.** TLS stream 10
+(`d2oeuvxi3kfsrw.cloudfront.net`) shows a **full handshake**:
+
+| Frame | Source | Handshake type |
+| ----- | ------ | -------------- |
+| 480 | client | 1 — ClientHello |
+| 485 | `3.160.30.142` | 2 — ServerHello |
+| **487** | `3.160.30.142` | **11 — Certificate** |
+| 489 | `3.160.30.142` | 22, 12, 14 |
+| 491 | client | 16, 20 |
+| 505 | `3.160.30.142` | 4 — NewSessionTicket, 20 |
+
+One ClientHello, one client random, **1 keylog hit**. **Keylog preserved as `nwly-keylog-p0b-20260830.txt`** — the working `nwly-keylog.txt` is truncated on the next cold launch; the preserved copy holds this session’s stream-10 key and is the mate to `p0b_b22469132_20260830-181911.pcap`, pairing re-verified by the randoms grep above. Contrast `p0_cold`, where the
+same endpoint carried two sessions on one TCP connection and the second random had
+zero hits (test #54). `tls.debug`: **295 decrypted records**, 2 `Cannot find master
+secret` — **neither on stream 10**.
+
+**DEF-2 — supported, not proven, and operationally solved.** The cold launch removed
+the resumption, which is what the hypothesis predicted. But this capture contains no
+resumed *game* session to test the mechanism against, so "the callback fires on full
+handshakes only" still rests on one consistent observation and no direct test. What
+**is** established is the workaround: a cold launch yields a full handshake on the
+queue stream and a logged key, and that is now standing procedure for any auth-phase
+capture.
+
+The two remaining failures are almost certainly out of scope. The only ClientHellos
+in the capture offering a **non-empty `session_id`** are `api.epicgames.dev` ×3 (EOS
+— excluded, CHARTER §3) and `analytics.services.jetbrains.com` (IntelliJ running on
+the host, not the game). **That attribution is circumstantial:** a `grep -B4` against
+the debug log returned no lines tying a failure to a stream, so it rests on the
+session-id correlation, not on direct evidence. Recorded as such rather than as a
+result.
+
+Incidental: the capture contains host-wide traffic — IntelliJ telemetry, Discord,
+mDNS, SSDP. Harmless here, but a future capture wanting a clean stream list can
+narrow with a BPF filter at tcpdump time.
+
+### 16.10 The world-address handoff — READ
+
+**Frame 1660, TLS stream 10, HTTP 200, 2,571 bytes**, content type `text/plain;
+charset=utf-8` — mislabelled; the body is JSON. It is the reply to
+`POST /prod/game/login/queue/v2/{WorldId}_{TicketId}/jwt/omni?tokenVersion=10`.
+
+Full field shape. Values elided where sensitive (CHARTER §3 — structure, never the
+secret):
+
+```
+LoginQueueResponse
+├─ TicketId            str(73)   "{WorldId}_{TicketId}" — the path segment, echoed back
+├─ AllowQueueTransfer  bool      false
+└─ Token
+   ├─ TokenVersion         int     10
+   ├─ HostHash             str(44) base64 → 32 bytes. UNRESOLVED — §16.12, FIND-4
+   ├─ AccountAge           int     seconds
+   ├─ CharacterId          str(36) GUID                      [REDACTED]
+   ├─ GenerateTime         int     unix seconds
+   ├─ IssueTime            int     unix seconds (GenerateTime − 1 observed)
+   ├─ IsPermanentAppOwner  bool
+   ├─ IsTrialOwner         bool
+   ├─ JwtClaims            str(1218)                         [REDACTED]
+   ├─ PersonaId            str(61)                           [REDACTED]
+   ├─ RepAddress           str     "35.71.190.194:44727"     ← THE HANDOFF
+   ├─ TicketId             str(36) GUID — the second half of the outer TicketId
+   ├─ SteamAppId           int     1063730
+   ├─ SteamUserId          str                               [REDACTED]
+   ├─ ChannelId            str     "STEAM_APP_ID.1063730"
+   ├─ LocationGroupId      str     "DEFAULT"
+   ├─ LocationId           str     "000"
+   ├─ WorldId              str(36) GUID — matches the path's WorldId
+   └─ Signature            str(512) hex → 256 bytes → RSA-2048  [REDACTED]
+```
+
+**`RepAddress` is a literal IPv4 address and port joined by a colon in a single
+string.** Not split across fields, not a hostname, not packed binary. That one string
+is what S0 must rewrite.
+
+**Ordering — the test that makes it load-bearing.** The response is at frame
+**1660**; the first world DTLS ClientHello to `35.71.190.194:44727` is at frame
+**1723**. **63 frames of margin.** The client is told where to go before it goes.
+
+**Exclusivity.** `grep -rl` for the address string across every object written by
+`--export-objects http` returned **exactly one file** — this one, out of 20+. The
+16,645-byte `getlogininfo` world list does **not** contain it, which **corroborates
+§16.3 rather than contradicting it**: the list names worlds by GUID, and the address
+arrives only on ticket redemption.
+
+Port note: `44727` is the same port as `p0_login`, which corrects §16.5's
+"different port each session" (§13).
+
+### 16.11 The queue is a poll loop, not a single call
+
+P0 saw two queue POSTs and read them as a refused US-West selection followed by a
+successful US-East one (§16.4). P0b's capture has the **same two-call shape with no
+refusal involved**, which means the two calls are the *normal* sequence and P0's
+reading was an artefact of how that session happened to unfold.
+
+| | **Call 1 — enqueue** | **Call 2 — redeem** |
+| - | ---- | ---- |
+| Path | `/queue/v2/jwt/omni?channelId=…&tokenVersion=10` | `/queue/v2/{WorldId}_{TicketId}/jwt/omni?tokenVersion=10` |
+| Request body | `{"LoginQueueRequest":{CharacterId, ClientCapabilities, IsTrialOwner, SteamAppId, SteamAuthTicket, WorldId}}` | `{"ClientCapabilities":[]}` — 25 bytes |
+| Response frame | **1586**, 214 B | **1660**, 2,571 B |
+| Response body | `{TicketId, AllowQueueTransfer, EstimatedTime:3, Position:0, RefreshInterval:2, QueueName:"DEFAULT000"}` | `{TicketId, AllowQueueTransfer, Token{…RepAddress…}}` |
+| Carries the address | **no** | **yes** |
+
+So: the client **enqueues**, receives a ticket plus a queue position, then **polls the
+ticket path** until the response carries a `Token`. Admission was immediate here —
+`Position: 0`, `EstimatedTime: 3` — so exactly one poll was needed.
+
+**Consequence for S0, and it is not cosmetic.** On a populated world the client will
+re-POST the ticket path every `RefreshInterval` seconds and receive position updates
+carrying **no `Token`** until admitted. A proxy that answers the ticket path once,
+with a token, works against an empty queue and is fragile against a full one.
+**Answer the poll shape, not the single observed exchange.**
+
+`QueueName: "DEFAULT000"` pairs with `Token.LocationGroupId: "DEFAULT"` and
+`Token.LocationId: "000"` — the queue is keyed per location group.
+
+### 16.12 OPEN-2 closed; `HostHash` and `Signature` characterised
+
+**`GUID2` is the queue ticket id.** Proven directly (test #57):
+
+```
+outer TicketId == "{WorldId}_{GUID2}"  : True
+Token.TicketId == GUID2                : True
+Token.CharacterId == GUID2             : False
+Token.WorldId == GUID2                 : False
+Token.WorldId == WorldId               : True
+```
+
+The path segment is a composite key naming *this queue ticket for that world*. **All
+three of §16.7's candidates — instance, shard, channel — were wrong**, and so was the
+`CharacterId` hypothesis raised at the start of this session (§13). The client does
+not supply `GUID2`: the server mints it in the enqueue response and the client echoes
+it back on redemption. **A redirect therefore does not have to produce it, only echo
+what it issued.**
+
+**`HostHash` — UNRESOLVED, deliberately.** 44 base64 chars → exactly 32 bytes, so the
+length is right for SHA-256. Not a bare digest of anything in the token: swept
+SHA-256/SHA-1/MD5/SHA-512 over every scalar field plus the bare IP and the bare port,
+then SHA-256 over all ordered pairs of those with separators `""`, `":"`, `"_"`,
+`"|"`. **Zero hits** (test #58). Remaining candidates: salted, HMAC with a server key,
+a digest over a field not present in this response, or an internal host identifier
+unrelated to `RepAddress`. **Do not chase open-endedly** — its weight depends entirely
+on OPEN-3. Recorded as FIND-4 so the sweep is not repeated blind.
+
+**`Signature`** is 512 hex characters → 256 bytes → **RSA-2048**, consistent with the
+RS256 chain in §16.4. It presumably covers the `Token` object, `RepAddress` included.
+We do not hold the key and will not.
+
+### 16.13 What S0 does now — revised from §16.6
+
+§16.6 items 1, 2, 4 and 5 stand. Items 2 and 4 are now **confirmed rather than
+inferred**, and there are three additions:
+
+1. **The interception point is confirmed**: the ticket-redeem response,
+   `POST /prod/game/login/queue/v2/{WorldId}_{TicketId}/jwt/omni`.
+2. **The rewrite is a single string**: `LoginQueueResponse.Token.RepAddress`, from
+   `ip:port` to ours. Nothing else in the response needs to change for the client to
+   dial elsewhere — **subject to OPEN-3**.
+3. **Handle the poll loop** (§16.11), not just the one exchange observed.
+4. **`RepAddress` is not a hostname**, so `/etc/hosts` remains useless for the world
+   host — but the *queue endpoint* `d2oeuvxi3kfsrw.cloudfront.net` **is**
+   DNS-resolvable, which is what makes the proxy shape possible at all.
+5. **Wine-prefix certificate trust is the first thing to scope**, before any proxy is
+   written. If the client pins, the whole shape changes.
+
+**The question that decides the shape is OPEN-3:** does the client verify
+`Token.Signature` (or `HostHash`) before dialling `RepAddress`? The world server is
+the natural verifier, and under S0/S1a the world server is **us** — so the signature
+only bites if the *client* checks it. Cheap static question; owned by **S0a**; answer
+it before S0 commits to a design.
+
+**S1a-relevant, and it advances P0 prediction 3.** The `Token` object **is** the world
+credential. §12B proved the DTLS handshake carries none of it, so it must be presented
+in the **first epoch-1 Carrier message**. That is now a concrete requirement rather
+than an open question about where a token might live. `JwtClaims`, `Signature`,
+`CharacterId`, `WorldId`, `TicketId` and the location fields are the material a world
+server would expect to receive and validate.
+
+### 16.14 Predictions — P0b (CHARTER §4)
+
+| # | Prediction, recorded before looking | Result |
+| - | ---------- | ------ |
+| **1** *(load-bearing)* | The queue response contains the world address, at a frame earlier than the first UDP datagram to that host. | **CONFIRMED.** `Token.RepAddress = "35.71.190.194:44727"` at frame 1660; first DTLS ClientHello to that host:port at 1723. Present in **exactly one** of 20+ exported objects. Test #56. |
+| **2** | JSON, address as a literal IP + port rather than a hostname. | **CONFIRMED as to type — and the session's own refinement of it was wrong.** Literal IP+port, but **joined in one string**, not split across fields as predicted mid-session. §13. |
+| **3** | Also carries a session token the world connection needs. | **CONFIRMED.** The whole `Token` object (§16.10). *Where* it enters the world stream is still unobserved and belongs to S1a. |
+| **4** | `GUID2` echoed or explained by the response. | **CONFIRMED, and it closes OPEN-2.** `GUID2 == Token.TicketId`. All three of §16.7's candidate meanings falsified. §16.12, test #57. |
+
+**Named failure mode that did not occur, recorded because it nearly did.** Before
+looking, this session flagged that a login *queue* classically returns a ticket and a
+poll URL rather than a destination, which would have falsified prediction 1 in a
+specific way. §16.11 shows that **is** the design — the client does enqueue, then
+poll — and prediction 1 survived only because admission was immediate at `Position:
+0`. On a queued world the first response carries no address. The prediction was right
+about the endpoint and lucky about the queue depth, and S0 must not inherit the luck.

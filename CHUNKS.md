@@ -53,6 +53,19 @@ the ready-to-paste prompt for each chunk.
 > that changed is struck through with its replacement beside it, including the four
 > paragraphs of the old Order section, quoted back verbatim.
 
+> **Fourth amendment, same day — P0b run, verdict COMPLETE; S0 unblocked and the
+> critical path is clear.** P0b ticked `[x]`; **S0 moved from `[!]` back to `[ ]`**,
+> its blocker OPEN-1 closed by reading `Token.RepAddress`. **OPEN-2 closed** in the
+> same chunk — `GUID2` is the queue ticket id, not instance/shard/channel. One chunk
+> created: **S0a**, a narrow static check answering **OPEN-3**, the question of
+> whether the client validates the token signature — which now gates S0's *design*
+> rather than its confidence. **`P0B_PROMPT.md` and `S0A_PROMPT.md` added to the
+> standalone-prompt list.** Order section amended: the perishable window has now been
+> spent on the one thing that needed it, so what remains is mostly file-based work
+> that survives 31 Jan 2027. Two claims inside `P0B_PROMPT.md` annotated — one
+> corrected, one marked untested rather than wrong. **No finding was altered and no
+> chunk un-ticked.**
+
 > **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
 > Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
 > missing); the Standing environment notes filled in with real values; completed
@@ -84,9 +97,11 @@ document, it should be the charter.
 
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
 its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`,
-**`P0_PROMPT.md`** — added 2026-08-30; it was missing from this list while P0 ran,
-which is the same "a prompt that exists only on one machine cannot be handed to
-anything" failure CHARTER §6.7 names).
+**`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`** — the first added
+2026-08-30 after it was missing from this list while P0 ran, which is the same "a
+prompt that exists only on one machine cannot be handed to anything" failure CHARTER
+§6.7 names; the latter two added the same day **at creation time**, which is the
+practice that failure was supposed to teach).
 Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
 not the summary.
@@ -147,7 +162,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 |       | Chunk                                     | Depends on | Deliverable                                     |
 | ----- | ----------------------------------------- | ---------- | ----------------------------------------------- |
 | `[x]` | **P0** Auth-phase decode (TCP/443)        | —          | **DONE 2026-08-30. VERDICT: PARTIAL.** Auth sequence documented end to end; **selection call identified** — `POST /prod/game/login/queue/v2/{WorldId}_{GUID2}/jwt/omni`; world list read and proven **GUID-only, no address field**. **The world address was NOT read:** the response carrying it does not decrypt (`Cannot find master secret`) → **OPEN-1**. STATE §16. Prompt: `P0_PROMPT.md` |
-| `[ ]` | **P0b** Decrypt the queue response       | P0         | **NEW 2026-08-30. The one thing standing between here and S0.** Re-capture forcing a **full** TLS handshake on the queue connection so the keylog records its key. Hypothesis: the callback fires on full handshakes only, so resumed sessions go unlogged (**DEF-2**). **Must be a cold launch** — login is Steam-inherited, so a fresh session replays the whole ticket→JWT→STS chain in-window *and* forces the full handshake; a resumed session gives neither. ~15 minutes, retryable — **but only until 31 Jan 2027.** STATE §16.7, test #54 |
+| `[x]` | **P0b** Decrypt the queue response       | P0         | **DONE 2026-08-30. VERDICT: COMPLETE.** A cold launch (Steam logged out and back in) forced a **full** TLS handshake on the queue stream; the key was logged and the response decrypted. **The world address is `LoginQueueResponse.Token.RepAddress`, a literal `"ip:port"` string**, at frame 1660 — 63 frames before the client's first DTLS ClientHello to that host:port, and present in **exactly one** of 20+ exported HTTP objects. **OPEN-1 closed. OPEN-2 closed** (`GUID2` = the queue ticket id). Predictions 1–4 all confirmed. **Also found: the queue is a poll loop**, which changes what S0 must answer. STATE §16.9–§16.14, tests #55–#59. Prompt: `P0B_PROMPT.md`. ~~**NEW 2026-08-30.** The one thing standing between here and S0.** Re-capture forcing a **full** TLS handshake on the queue connection so the keylog records its key. Hypothesis: the callback fires on full handshakes only, so resumed sessions go unlogged (**DEF-2**). **Must be a cold launch** — login is Steam-inherited, so a fresh session replays the whole ticket→JWT→STS chain in-window *and* forces the full handshake; a resumed session gives neither. ~15 minutes, retryable — **but only until 31 Jan 2027.** STATE §16.7, test #54~~ |
 | `[ ]` | **P0c** Decode `PublishedData`           | P0         | **NEW 2026-08-30. Cheap, and it is server→client state.** Base64 + zlib (`eNr…`) blobs in `Characters[]` of the `getlogininfo` response — a response we can **already read**, no keys and no new capture needed. FIND-3, STATE §16.3 |
 | `[ ]` | **P1** Handshake sequence                 | ~~T5~~ **T5 done**, ~~H3~~ **S1a or H3** | The connect exchange, byte-documented. **Scope narrowed — the epoch-0 DTLS half is already byte-documented in STATE §12B; what remains is the GridMate `Carrier` handshake inside epoch ≥ 1.** Reachable from S1a's plaintext for the client→server half without H3 |
 | `[ ]` | **P2** Message-type census                | ~~H3~~ **H2, or S1a, or FIND-2** | The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3 |
@@ -159,7 +174,8 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                       | Depends on | Deliverable                          |
 | ----- | ------------------------------------------- | ---------- | ------------------------------------ |
-| `[!]` | **S0** Redirection feasibility              | ~~P0~~ **P0b** | **BLOCKED 2026-08-30 on OPEN-1**, and the dependency has moved from P0 to **P0b**. P0 established *where* the handoff is but not *what it says*. Two findings already reshape this chunk: **(a) a hosts/DNS redirect will not work** — no DNS query resolves the world host in five captures, so there is no name to catch; **(b) the interception point is the queue response**, which means a **TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net`** (that host *is* DNS-resolvable), with Wine-prefix certificate trust as the obstacle to scope. Requirements derived in STATE §16.6 |
+| `[ ]` | **S0** Redirection feasibility              | ~~P0~~ ~~P0b~~ **none — P0b done** | **UNBLOCKED 2026-08-30.** P0b read the handoff: the client is handed **`Token.RepAddress`** (literal `ip:port`) in the reply to the ticket-redeem POST, 63 frames before it dials that host. Requirements in **STATE §16.13**. **New constraint from P0b: the queue is a poll loop** — on a populated world the client re-POSTs the ticket path every `RefreshInterval` seconds and gets no `Token` until admitted, so a proxy that answers once is fragile (STATE §16.11). **New gate: OPEN-3** — does the client validate `Token.Signature`? Owned by **S0a**; answer it before committing to a design. ~~**BLOCKED 2026-08-30 on OPEN-1**, and the dependency has moved from P0 to **P0b**. P0 established *where* the handoff is but not *what it says*. Two findings already reshape this chunk: **(a) a hosts/DNS redirect will not work** — no DNS query resolves the world host in five captures, so there is no name to catch; **(b) the interception point is the queue response**, which means a **TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net`** (that host *is* DNS-resolvable), with Wine-prefix certificate trust as the obstacle to scope. Requirements derived in STATE §16.6~~ **(a) and (b) both still stand and are now confirmed rather than inferred.)** |
+| `[ ]` | **S0a** Does the client validate the queue token? | — | **NEW 2026-08-30. Narrow, static, free, and it gates S0's design.** Answers **OPEN-3**: does `NewWorld.exe` verify `Token.Signature` (RSA-2048) or `Token.HostHash` before dialling `Token.RepAddress`? If it does not — the expected answer, since the *world server* is the natural verifier and under S1a that is us — S0 can rewrite one string and be done. If it does, S0 needs a different mechanism entirely. **Static Ghidra work on a binary we already have**, no login, no Proton, no deadline — and it leaves behind the analysed project **H2** needs anyway. STATE §16.12, §16.13. Prompt: `S0A_PROMPT.md` |
 | `[ ]` | **S1a** DTLS server (epoch 0)               | T5         | **NEW 2026-08-30, unblocked, no EAC contact.** Fully specified by §12B. **The inversion: when the client handshakes with us we hold the session keys, so its messages arrive as plaintext on our socket** — this replaces H3 for the client→server half |
 | `[!]` | **S1b** Carrier handshake (epoch ≥ 1)       | S1a, P1    | The GridMate `DefaultHandshake` / connection request-ack inside the encrypted channel |
 | `[!]` | **S2** Stand a character in the world       | S1b, P4    | A character loads and renders         |
@@ -246,31 +262,52 @@ get pursued or recorded.
 > that date** (P0b, and any future live-traffic observation); **file-dependent chunks
 > do not** (H2, P2/FIND-2, S1a against the reference, H1, H4). When in doubt about
 > what to run next, run the perishable thing.
+>
+> **Amended after P0b, 2026-08-30 — the perishable window has now been spent on the
+> thing that needed it.** P0b was the last chunk whose *input* could only come from a
+> live backend, and it landed. What remains is almost entirely file-based and survives
+> the retirement date. **The one residual exposure is S0**: its design work is
+> file-based, but *proving* a redirect works needs a live client **and** a live
+> backend to proxy. Schedule S0's empirical half before 31 Jan 2027 even though
+> nothing about it is urgent today. **A second, cheaper hedge: take more captures than
+> seem necessary now.** A pcap and its paired keylog are re-readable forever; the
+> servers are not.
 
-**The order, none of items 1–8 contacting a running retail client. Amended
-2026-08-30 after P0:**
+**The order, none of items 1–9 contacting a running retail client. Amended
+2026-08-30 after P0, and again the same day after P0b:**
 
 1. ~~**P0** — auth-phase decode.~~ **DONE (PARTIAL), STATE §16.** Left a single
    blocker on the critical path: **OPEN-1**, the undecrypted queue response.
-2. **P0b** — decrypt the queue response. **PERISHABLE and critical-path: this is what
-   S0 waits on.** ~15 minutes. Do it before the deadline and before anything that
-   doesn't perish. STATE §16.7.
+2. ~~**P0b** — decrypt the queue response.~~ **DONE (COMPLETE), STATE §16.9–§16.14.**
+   OPEN-1 and OPEN-2 both closed; the world address is `Token.RepAddress`. **The
+   critical path is clear.**
+2a. **S0a** — does the client validate `Token.Signature`? **Answers OPEN-3, the
+   project's only live gate.** Static, free, no deadline, and it leaves behind the
+   analysed Ghidra project H2 needs. Run it before S0.
 3. **H2** — static Ghidra. Scope it **ambitiously**: a primary source of protocol
-   structure, not just a hook-targeting step. File-based, no deadline.
+   structure, not just a hook-targeting step. File-based, no deadline. **Shares S0a's
+   instrument** — if S0a ran first, H2 starts warm.
 4. **P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. File-based.
 5. **P0c** — decode `PublishedData` (FIND-3). Cheap, no capture, server→client state.
-6. **S0** — redirection feasibility. **Unblocks once P0b lands.** STATE §16.6 already
-   derived its requirements: proxy the queue endpoint, not a DNS name.
+6. **S0** — redirection feasibility. ~~**Unblocks once P0b lands.**~~ **UNBLOCKED.**
+   Requirements in **STATE §16.13**, revised from §16.6. Proxy the queue endpoint, not
+   a DNS name; rewrite `Token.RepAddress`; **answer the poll loop, not one exchange**;
+   scope Wine certificate trust first. **Partly perishable** — see the deadline note.
 7. **S1a** — the DTLS server. **The inversion:** the client handshakes with us, we
    hold the keys, its messages arrive as plaintext on our socket. Reference-testable
-   now, no deadline.
+   now, no deadline. **P0b sharpened its input:** the `Token` object is the world
+   credential and must arrive in the first epoch-1 Carrier message (STATE §16.13).
 8. **H1** — reference-build hook and signature scan. **H4** — reflection-reader
    decision gate. Both static, independent, no deadline.
 9. **H3** — last resort only.
 
-**Start with P0b.** It is short, it is on the critical path, and it is the one
-remaining chunk whose input disappears on a fixed date. Everything else here still
-works in February 2027; P0b does not.
+**Start with S0a.** ~~**Start with P0b.** It is short, it is on the critical path, and
+it is the one remaining chunk whose input disappears on a fixed date. Everything else
+here still works in February 2027; P0b does not.~~ **Superseded — P0b is done.** S0a
+is now the cheapest thing on the board that changes a downstream decision: it is
+static, needs no client and no network, and it determines whether S0's proxy design
+survives contact. Running it first may save S0 an entire wasted iteration, and it
+warms H2's instrument either way.
 
 **What this order does not yield** is the server→client direction in captured form.
 Items 1–7 give the client's outbound messages plus whatever comes out of the binary;
