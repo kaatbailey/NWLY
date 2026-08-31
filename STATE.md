@@ -5,7 +5,7 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-30** |
-| Written against commit | **FILL BEFORE PUSH** — `git rev-parse --short HEAD` after committing this update |
+| Written against commit | 2b0c5fc |
 | Section count (every `## ` header, this one included) | **19** |
 | Highest test number (§14) | **59** |
 | Correction row count (§13) | **26** |
