@@ -5,7 +5,7 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-08-30** |
-| Written against commit | 83b0d6d |
+| Written against commit | a468660 |
 | Section count (every `## ` header, this one included) | **19** |
 | Highest test number (§14) | **54** |
 | Correction row count (§13) | **22** |
