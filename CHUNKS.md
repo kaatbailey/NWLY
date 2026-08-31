@@ -66,6 +66,22 @@ the ready-to-paste prompt for each chunk.
 > corrected, one marked untested rather than wrong. **No finding was altered and no
 > chunk un-ticked.**
 
+> **Fifth amendment, 2026-08-31 — S0a run, verdict NO (confirmed by trace); OPEN-3 and
+> OPEN-3R both resolved, S0 is the small branch.** S0a ticked `[x]`. Static Ghidra trace of
+> `NewWorld.exe` (b22469132): **no asymmetric-verify API is imported** (BCRYPT/CAPI/
+> CRYPT32 present, but no `BCryptVerifySignature`/`BCryptImportKeyPair`, no
+> `CryptVerifySignature`/`CryptImportKey`), and **five functions on the address path
+> are crypto-free** — the dial (`FUN_14644a070` case 9), the connect (`FUN_146425f20`),
+> the queue-login launcher (`FUN_146465060`), the request guard (`FUN_146435e40`), and
+> the disconnect reporter (`FUN_14643c570`). None reads a `Signature`/`HostHash` field;
+> none calls a verify. **`OPEN-3` moved to RESOLVED (provisional NO)** in STATE §15; S0
+> proceeds as the field-rewrite proxy. Initially recorded as a provisional NO (consume
+> side only); the residual was then closed in the same session by reading the deserializer
+> directly, so the verdict is a **traced** NO with no outstanding residual. Two corrections added to STATE §13 (the committed
+> `pins/` claim; the S0a-prompt "field names are literal JSON keys" assumption). Findings
+> folded to STATE §16.15; tests #60–#61 logged. **`S0A_PROMPT.md` still needs its DONE
+> banner** — a one-block edit noted below. No finding altered, no chunk un-ticked.
+
 > **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
 > Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
 > missing); the Standing environment notes filled in with real values; completed
@@ -174,8 +190,8 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
 |       | Chunk                                       | Depends on | Deliverable                          |
 | ----- | ------------------------------------------- | ---------- | ------------------------------------ |
-| `[ ]` | **S0** Redirection feasibility              | ~~P0~~ ~~P0b~~ **none — P0b done** | **UNBLOCKED 2026-08-30.** P0b read the handoff: the client is handed **`Token.RepAddress`** (literal `ip:port`) in the reply to the ticket-redeem POST, 63 frames before it dials that host. Requirements in **STATE §16.13**. **New constraint from P0b: the queue is a poll loop** — on a populated world the client re-POSTs the ticket path every `RefreshInterval` seconds and gets no `Token` until admitted, so a proxy that answers once is fragile (STATE §16.11). **New gate: OPEN-3** — does the client validate `Token.Signature`? Owned by **S0a**; answer it before committing to a design. ~~**BLOCKED 2026-08-30 on OPEN-1**, and the dependency has moved from P0 to **P0b**. P0 established *where* the handoff is but not *what it says*. Two findings already reshape this chunk: **(a) a hosts/DNS redirect will not work** — no DNS query resolves the world host in five captures, so there is no name to catch; **(b) the interception point is the queue response**, which means a **TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net`** (that host *is* DNS-resolvable), with Wine-prefix certificate trust as the obstacle to scope. Requirements derived in STATE §16.6~~ **(a) and (b) both still stand and are now confirmed rather than inferred.)** |
-| `[ ]` | **S0a** Does the client validate the queue token? | — | **NEW 2026-08-30. Narrow, static, free, and it gates S0's design.** Answers **OPEN-3**: does `NewWorld.exe` verify `Token.Signature` (RSA-2048) or `Token.HostHash` before dialling `Token.RepAddress`? If it does not — the expected answer, since the *world server* is the natural verifier and under S1a that is us — S0 can rewrite one string and be done. If it does, S0 needs a different mechanism entirely. **Static Ghidra work on a binary we already have**, no login, no Proton, no deadline — and it leaves behind the analysed project **H2** needs anyway. STATE §16.12, §16.13. Prompt: `S0A_PROMPT.md` |
+| `[ ]` | **S0** Redirection feasibility              | ~~P0~~ ~~P0b~~ **none — P0b done** | **UNBLOCKED 2026-08-30.** P0b read the handoff: the client is handed **`Token.RepAddress`** (literal `ip:port`) in the reply to the ticket-redeem POST, 63 frames before it dials that host. Requirements in **STATE §16.13**. **New constraint from P0b: the queue is a poll loop** — on a populated world the client re-POSTs the ticket path every `RefreshInterval` seconds and gets no `Token` until admitted, so a proxy that answers once is fragile (STATE §16.11). ~~**New gate: OPEN-3** — does the client validate `Token.Signature`? Owned by **S0a**; answer it before committing to a design.~~ **OPEN-3 RESOLVED NO 2026-08-31 (S0a, STATE §16.15) — confirmed by direct trace of the deserializer, no residual.** The client stores `Token.Signature`/`HostHash` without ever verifying them, so rewriting `RepAddress` breaks nothing the client checks. **S0 is the small branch: rewrite the one `RepAddress` string.** OPEN-3R closed same session; no empirical test needed. ~~**BLOCKED 2026-08-30 on OPEN-1**, and the dependency has moved from P0 to **P0b**. P0 established *where* the handoff is but not *what it says*. Two findings already reshape this chunk: **(a) a hosts/DNS redirect will not work** — no DNS query resolves the world host in five captures, so there is no name to catch; **(b) the interception point is the queue response**, which means a **TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net`** (that host *is* DNS-resolvable), with Wine-prefix certificate trust as the obstacle to scope. Requirements derived in STATE §16.6~~ **(a) and (b) both still stand and are now confirmed rather than inferred.)** |
+| `[x]` | **S0a** Does the client validate the queue token? | — | **DONE 2026-08-31. VERDICT: NO — confirmed by direct trace.** Static Ghidra trace of `NewWorld.exe` b22469132: five consume-side functions crypto-free, no asymmetric-verify API imported, **and the deserializer itself read** (`FUN_1474e4f20` → `FUN_1474e5990`) — `Signature`/`HostHash`/`RepAddress` are stock AWS-SDK `JsonView` GetString-and-store, never inspected. Client treats `RepAddress` as opaque cargo (Token +0x5a) → **S0 is the small field-rewrite branch.** OPEN-3 and its residual OPEN-3R both closed same session; `HostHash` characterised (store, not compare). STATE §16.15, §15; tests #60–#62. Prompt: `S0A_PROMPT.md` |
 | `[ ]` | **S1a** DTLS server (epoch 0)               | T5         | **NEW 2026-08-30, unblocked, no EAC contact.** Fully specified by §12B. **The inversion: when the client handshakes with us we hold the session keys, so its messages arrive as plaintext on our socket** — this replaces H3 for the client→server half |
 | `[!]` | **S1b** Carrier handshake (epoch ≥ 1)       | S1a, P1    | The GridMate `DefaultHandshake` / connection request-ack inside the encrypted channel |
 | `[!]` | **S2** Stand a character in the world       | S1b, P4    | A character loads and renders         |
@@ -281,9 +297,12 @@ get pursued or recorded.
 2. ~~**P0b** — decrypt the queue response.~~ **DONE (COMPLETE), STATE §16.9–§16.14.**
    OPEN-1 and OPEN-2 both closed; the world address is `Token.RepAddress`. **The
    critical path is clear.**
-2a. **S0a** — does the client validate `Token.Signature`? **Answers OPEN-3, the
-   project's only live gate.** Static, free, no deadline, and it leaves behind the
-   analysed Ghidra project H2 needs. Run it before S0.
+2a. ~~**S0a** — does the client validate `Token.Signature`?~~ **DONE (NO, confirmed by
+   trace), STATE §16.15.** OPEN-3 and OPEN-3R both closed: the deserializer was read and
+   `Signature`/`HostHash` are stored-not-verified. S0 is the field-rewrite branch with no
+   residual. The Ghidra project is analysed and warm for H2 (RTTI ran; the GameConnection
+   state machine, the connect, the object layout, and both JSON deserializers are
+   landmarked in §16.15).
 3. **H2** — static Ghidra. Scope it **ambitiously**: a primary source of protocol
    structure, not just a hook-targeting step. File-based, no deadline. **Shares S0a's
    instrument** — if S0a ran first, H2 starts warm.
@@ -301,13 +320,17 @@ get pursued or recorded.
    decision gate. Both static, independent, no deadline.
 9. **H3** — last resort only.
 
-**Start with S0a.** ~~**Start with P0b.** It is short, it is on the critical path, and
+~~**Start with S0a.**~~ **Superseded 2026-08-31 — S0a is done (NO, confirmed by trace;
+STATE §16.15).** ~~**Start with P0b.** It is short, it is on the critical path, and
 it is the one remaining chunk whose input disappears on a fixed date. Everything else
-here still works in February 2027; P0b does not.~~ **Superseded — P0b is done.** S0a
+here still works in February 2027; P0b does not.~~ ~~**Superseded — P0b is done.** S0a
 is now the cheapest thing on the board that changes a downstream decision: it is
 static, needs no client and no network, and it determines whether S0's proxy design
 survives contact. Running it first may save S0 an entire wasted iteration, and it
-warms H2's instrument either way.
+warms H2's instrument either way.~~ **Next is H2** (static Ghidra, now warm from S0a —
+scope it ambitiously) **or S0** (design the field-rewrite proxy on the small branch,
+carrying OPEN-3R). Both file-based, no deadline. **S0 has no perishable thread left** — OPEN-3 was closed
+statically, so S0 needs no live-backend confirmation to commit to its design.
 
 **What this order does not yield** is the server→client direction in captured form.
 Items 1–7 give the client's outbound messages plus whatever comes out of the binary;

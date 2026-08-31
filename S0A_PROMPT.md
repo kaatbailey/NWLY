@@ -1,5 +1,25 @@
 # S0a — Does the client validate the queue token?
 
+> ## ✅ DONE 2026-08-31 — VERDICT: **NO**, confirmed by direct trace.
+> The client does **not** verify `Token.Signature` or check `Token.HostHash` before
+> dialling `Token.RepAddress`. It stores both like any other string and never inspects
+> them. **S0 is the small branch:** rewrite the one `RepAddress` string; no re-signing,
+> no key, no residual. Findings in **STATE §16.15**; OPEN-3 + OPEN-3R closed in §15;
+> tests #60–#62. **Prediction 1 confirmed; predictions below annotated.**
+>
+> **How it was actually settled (differs from Steps 1–2 as written — see strikes):**
+> the field names are **not** literal JSON keys with a single deserialiser cluster
+> (Step 1's premise — falsified, STATE §13). The queue body is parsed as a raw
+> `Aws::JsonView`: there is no typed Result/Token model, only `Request` classes. The
+> deserialiser was found by xref of the *response-unique* keys `AllowQueueTransfer` /
+> `JwtClaims`, not by clustering `RepAddress`/`Signature`/`HostHash`. Two functions:
+> `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (the `Token`). In the Token parser,
+> `Signature`(+0x64), `HostHash`(+0x24) and `RepAddress`(+0x5a) are each pulled by the
+> **same** stock GetString helper (`FUN_1474654e0`), stored, and never read again — no
+> verify, structurally impossible in SDK codegen. No Windows verify API is imported;
+> the static-OpenSSL escape hatch was excluded by *reading the parser*, not by import
+> absence. **No execution, no hooking, no EAC — CHARTER §3 held throughout.**
+
 **Read `CHARTER.md` and `STATE.md` first. This file is the chunk; those two are the
 context. Do not act on a summary of either.**
 
@@ -40,9 +60,18 @@ Either result is a finding. This chunk is done when the bit is set with evidence
 
 ## Why this is answerable statically
 
-The queue response is JSON the client parses (§16.10). Three field names are the
+>
+> **✗ FALSIFIED (STATE §13).** The field names are **not** literal keys the deserialiser
+> clusters on. `LoginQueueResponse` has zero matches; `RepAddress` appears only in a log
+> format string; `HostHash`/`TicketId` only as trailing-space label text; `Signature`
+> only in an AWS SigV4/error neighbourhood. The parse is a raw `JsonView` `GetString(key)`
+> sequence; the keys are call arguments, found via the response-unique `AllowQueueTransfer`
+> / `JwtClaims`. The reasoning below (what a verify would look like) still held; only the
+> *anchor* changed.
+
+~~The queue response is JSON the client parses (§16.10). Three field names are the
 entry points, and they are almost certainly present as **literal strings in the
-binary** — the JSON deserialiser keys on them:
+binary** — the JSON deserialiser keys on them:~~
 
 - `RepAddress` — the field the client reads to get its destination.
 - `Signature` — if the client verifies, the code that reads this feeds an RSA verify.
@@ -69,7 +98,7 @@ find (dirname $NW) -maxdepth 1 -name 'NewWorld.exe' -printf '%p  %s bytes\n'
 sha256sum $NW
 ```
 
-Check the SHA-256 against `pins/22469132/Bin64.sha256` (STATE §5) — **this must be the
+Check the SHA-256 against `pins/22469132/Bin64.sha256` **[✗ was not committed when S0a ran — STATE §13; used the local `~/Documents/nwly-pin/22469132/Bin64.sha256` instead. Matched: `8654f01d…e0fdc8e`, `NewWorld.exe: OK`.]** (STATE §5) — **this must be the
 same build P0b captured**, or the string offsets describe a different binary. If it
 does not match, stop and say so (CHARTER §6.3); do not analyse a build the findings
 won't apply to.

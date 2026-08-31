@@ -4,13 +4,13 @@
 
 | Field | Value |
 | ----- | ----- |
-| Last updated | **2026-08-30** |
-| Written against commit | 2b0c5fc |
-| Section count (every `## ` header, this one included) | **19** |
-| Highest test number (§14) | **59** |
-| Correction row count (§13) | **26** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b |
-| Open gates | **1** — **OPEN-3** (does the client validate `Token.Signature`?), §15. GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
+| Last updated | **2026-08-31** |
+| Written against commit | **FILL ON COMMIT** — prior value `2b0c5fc` was stale (HEAD was `6eea228` on 2026-08-31; the field lagged the content, which was byte-current). Set this to the commit that carries these S0a edits. |
+| Section count (every `## ` header, this one included) | **19** (§16.15 is a `###` subsection, not a new `## `) |
+| Highest test number (§14) | **62** |
+| Correction row count (§13) | **28** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, **S0a** |
+| Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
 read on, not to propose anything:
@@ -1490,6 +1490,8 @@ claim adds a row here rather than deleting the claim.
 
 | Old claim | Status |
 | --------- | ------ |
+| "**Committed to the repo at `pins/22469132/Bin64.sha256` — hashes only, no Amazon content.**" — §5, patch-detection baseline. | **Was WRONG at S0a runtime, now fixed.** `git ls-files` on `origin/Master` (HEAD 6eea228, 2026-08-31) shows **no `pins/` path at all**; the baseline exists only locally at `~/Documents/nwly-pin/22469132/Bin64.sha256`. Verified via `git ls-files`, not the blob page (CHARTER §6.3). Consequence: the S0a Step-0 SHA check cannot run against the repo path from a fresh clone — it must use the local pin. **Action:** the file is charter-safe to commit (hashes only, no Amazon content), so commit it and the claim becomes true; until then it is a false claim about our own repo. Caught during S0a while walking the tree for the pin. **Resolved 2026-08-31: the file was committed this session, so §5's claim is now true; the S0a run itself used the local pin.** |
+| "The three field names (`RepAddress`, `Signature`, `HostHash`) sit as **literal JSON keys the deserialiser clusters on**." — `S0A_PROMPT.md` Step 1, "Why this is answerable statically." | **FALSIFIED (S0a, §16.15).** They are not literal keys: `LoginQueueResponse` — zero matches; `RepAddress` — only in the case-9 log format string; `HostHash `/`TicketId ` — only as trailing-space .rdata label text; `Signature` — only in an AWS SigV4/error neighbourhood. The queue `Token` is deserialised through a **generic/reflective** AWS-SDK path (`Aws::JavelinGatewayService::Model::PostGameLoginQueueV2TicketIdRequest`), not a bespoke per-field parser. The string-xref anchor the prompt assumed did not exist; the trace used the `GameConnectionWrapper` log string and the +0x1100 object offset instead. This is why OPEN-3 closed inferred-not-traced (the field read-sites are not string-addressable). |
 | "**No edits to Amazon's tree**, which keeps the charter's version-locking rule satisfied." — §7's `/opt/llvm14` decision. Also test #6: "No source edits required." | **WRONG, and it affects the build pin.** `dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h` reads `false_v<>` at lines 161/169/177/185/193; Amazon's original is `false_v<T>`. `git status --short` in `~/Documents/lumberyard` is **clean**, so the patch is committed to the fork, not a working-tree edit. Evidence: `rg -n 'false_v' dev/Code/Framework/AzCore/AzCore/RTTI/TypeInfo.h`. **Consequence:** §5's fork pin `413ecaf24d7a...` does **not** describe the tree that built. Charter §4 version-locking is satisfied by pinning the patched commit, not by the absence of edits. Caught because the recovered `CMakeLists.txt` documented the patch in a header comment — a file that was nearly discarded unread. **Both follow-up actions are now closed (tests #31, #32):** the patch is commit **`7d4f1ee6`**, the only one on top of `413ecaf`, and it is pushed. §5 now carries a read-from / built-from pair. Test #20's reproducibility result holds for `7d4f1ee6`. `-fdelayed-template-parsing` was briefly believed redundant on the strength of this patch — **that was wrong, see the next row.** |
 | "`-fdelayed-template-parsing` is redundant now that `7d4f1ee6` patches `TypeInfo.h`." — inferred from `Vector3.cpp` compiling exit 0 without the flag (test #32). | **WRONG, and the probe was the problem.** The flag guards a *second, unrelated* defect: `std/containers/queue.h:202` reads `rhs.m_continer` where the member is `m_container` — a one-character typo in Amazon's source, inside `priority_queue::swap()`, an uninstantiated template body. `queue.h` is included nearly everywhere, so removing the flag costs **108 compile failures** (60/191 without, 151/191 with — tests #33, #34). `7d4f1ee6` fixes five `static_assert` sites and nothing else. **Cause of the error: `Vector3.cpp` is Math-only and never includes `queue.h`, so it could not have detected this.** Picking the TU that surfaced the *original* symptom felt like the right probe and was in fact the narrowest possible one. Lesson: a single-TU result generalises to the build only when the TU's include surface covers what is being tested. |
 | "**C++ standard: C++14.** Waf sets `-std=c++1y`; pass `-std=c++14` to a standalone build." — §7 Build facts, stated as CONFIRMED from the Waf config. | **WRONG for any modern clang.** `AzCore/Math/Crc.inl:114` uses `auto` as a template parameter, a C++17 feature, and under `-std=c++14` that is a hard error with no flag that rescues it. `-std=c++17` compiles clean. Cause of the error: read the build *config* and treated it as the language level the *source* requires. `-std=c++1y` was what the 2019 clang was told; it is not what the code needs today. |
@@ -1585,6 +1587,9 @@ result — so no test is silently retried and no result is remembered wrong.
 | 57 | **P0b** compare `GUID2` against `Token.TicketId`, `Token.CharacterId`, `Token.WorldId`, and the outer `TicketId` against `"{WorldId}_{GUID2}"`. | Session hypothesis: `GUID2` is the `CharacterId`, moved from body to path the way `WorldId` was (§16.4). | **Falsified, and OPEN-2 closed by the same run.** `Token.CharacterId == GUID2` → False. `Token.TicketId == GUID2` → **True**; outer `TicketId == "{WorldId}_{GUID2}"` → **True**; `Token.WorldId == WorldId` → True. `GUID2` is the **queue ticket id**. §16.12. |
 | 58 | **P0b** `HostHash` preimage sweep: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, then SHA-256 over all ordered pairs of those with separators `""`, `":"`, `"_"`, `"|"`. | `HostHash` is a SHA-256 of `RepAddress` or one of its components. | **Falsified. Zero hits.** 44 base64 chars → exactly **32 bytes**, so the length is right for SHA-256, but no tested preimage matches. Salted, HMAC'd with a server key, computed over a field not present in this response, or not a digest of the address at all. **Left unresolved deliberately** — its weight depends entirely on OPEN-3. Recorded as **FIND-4** so it is not re-swept blind. §16.12. |
 | 59 | **P0b** read the 214-byte reply to the *generic* queue POST (frame 1586), which `--export-objects` did not write out (no exported object is under 1 KB); read it by frame instead via `http.file_data`. | It hands back the ticket id that the second call addresses. | **Confirmed, and it revealed the poll loop.** Body carries `TicketId`, `AllowQueueTransfer`, `EstimatedTime: 3`, `Position: 0`, `RefreshInterval: 2`, `QueueName: "DEFAULT000"` — and **no `Token` and no address**. So the two-call sequence is **enqueue-then-redeem**, not P0's reading of refused-then-accepted (§16.4), and a *queued* world would have the client poll the ticket path every `RefreshInterval` seconds until a `Token` appears. Changes what S0 must answer. §16.11. |
+| 60 | **S0a** import-table survey of `NewWorld.exe` (b22469132) for an asymmetric-signature-verify API, via Ghidra Symbol Tree → Imports. | If the client verifies the queue `Token`, a verify API (CNG `BCryptVerifySignature`, CAPI `CryptVerifySignature`, or a static-OpenSSL EVP) is reachable. | **No Windows verify API imported.** BCRYPT has symmetric/hash/RNG + `BCryptImportKey/ExportKey` but **no `BCryptImportKeyPair`/`BCryptVerifySignature`**; CAPI has `CryptSignHashW` (signing) but no verify/`CryptImportKey`; CRYPT32 is base64+DPAPI only. Any client verify could only be static OpenSSL. Point toward NO, not proof. §16.15. |
+| 61 | **S0a** traced the five functions on the `RepAddress` consume path (dial `FUN_14644a070` case 9, connect `FUN_146425f20`, launcher `FUN_146465060`, guard `FUN_146435e40`, disconnect-report `FUN_14643c570`) for any read of `Signature`/`HostHash` or any verify/EVP call. | Prediction 1 (load-bearing): `RepAddress` flows to a socket connect; `Signature`/`HostHash` are stored-and-forwarded; no crypto on the path. | **Consistent with prediction 1. None of the five reads a `Signature`/`HostHash` field or calls a verify;** `RepAddress` (obj +0x1100) goes straight to the driver connect. **But the `Signature` read-site and the deserializer write-site were never located** (register-relative std::string assigns defeat scalar/string search), so this is the consume side only — inferred NO, residual OPEN-3R. §16.15. |
+| 62 | **S0a (OPEN-3R)** located and read the queue-response deserializer, found via xref of the response-unique keys `AllowQueueTransfer`/`JwtClaims`: `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (`Token`). | Prediction 1, direct form: `Signature`/`HostHash` are `GetString`-and-store, no verify at parse time. | **CONFIRMED. Both are pulled by the stock AWS-SDK `JsonView` GetString helper (`FUN_1474654e0`), stored into Token members (Signature +0x64, HostHash +0x24, RepAddress +0x5a), and never read/hashed/verified/compared again.** No inline verification — structurally impossible in SDK codegen. Upgrades OPEN-3 from provisional to traced NO; closes OPEN-3R. §16.15. |
 
 ---
 
@@ -1645,14 +1650,15 @@ FIND-2 are the substitute for observing it.
 | -- | ---- | ------ | ------ |
 | ~~**OPEN-1**~~ **CLOSED** | ~~**The queue response (frame 2648 of `p0_cold`) does not decrypt.**~~ It is the reply to the call that names the world, it precedes the world DTLS ClientHello by 68 frames, and it is the only remaining place the world address can be delivered. `tls.debug`: `Cannot find master secret`. | **S0 — its design, not merely its confidence.** | **CLOSED 2026-08-30 by P0b.** A cold launch (Steam logged out and back in) forced a **full** handshake on the queue stream; the key was logged and the body decrypted. The world address is **`LoginQueueResponse.Token.RepAddress`**, a literal `"ip:port"` string, at frame 1660 — 63 frames before the client's first DTLS ClientHello to that host:port, and present in **exactly one** of 20+ exported objects. **S0 is unblocked.** §16.9, §16.10; tests #55, #56. |
 | ~~**OPEN-2**~~ **CLOSED** | ~~**`GUID2` in the selection path `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, channel.~~ | S0 — a redirect must produce or echo it. | **CLOSED 2026-08-30 by P0b. All three candidates were wrong.** `GUID2` is the **queue ticket id** (`Token.TicketId == GUID2`; outer `TicketId == "{WorldId}_{GUID2}"`). It is **server-minted** in the enqueue response and echoed back by the client on redemption — so a redirect does not have to *produce* it, only echo what it issued. §16.12, test #57, §13. |
-| **OPEN-3** | **Does the client validate `Token.Signature` (RSA-2048, 256 bytes) or `Token.HostHash` (32 bytes) before dialling `Token.RepAddress`?** | **S0's design shape** — not merely its confidence. | **OPEN, and it is the project's only live gate.** Owner: **S0a** (static, in Ghidra — cheapest route, and it warms the project H2 needs anyway), with an empirical fallback inside S0. The world server is the natural verifier of that signature, and under S0/S1a the world server is **us** — so the signature only bites if the *client* checks it. If it does, a proxy that rewrites `RepAddress` breaks the signature and S0 needs a different mechanism. **Answer this before S0 commits to a design.** §16.12, §16.13. |
+| ~~**OPEN-3**~~ **RESOLVED (NO — confirmed by trace)** | ~~**Does the client validate `Token.Signature` (RSA-2048, 256 bytes) or `Token.HostHash` (32 bytes) before dialling `Token.RepAddress`?**~~ | S0's design shape. | **RESOLVED 2026-08-31 by S0a → NO, confirmed by direct trace. §16.15.** No asymmetric-verify API imported; five consume-side functions crypto-free; **and the deserializer itself was read** (`FUN_1474e4f20` → `FUN_1474e5990`): `Signature`/`HostHash`/`RepAddress` are pulled by the stock AWS-SDK `JsonView` GetString helper, stored, and never inspected. Client treats `RepAddress` as opaque cargo → **S0 is the small field-rewrite branch.** Upgraded from the provisional NO recorded earlier the same day; **OPEN-3R closed.** |
+| ~~**OPEN-3R**~~ **CLOSED** | ~~Residual of OPEN-3: is there a verify at *deserialize* time?~~ | ~~S0~~ | **CLOSED 2026-08-31, same session. Route (a) taken.** The deserializer was located by xref of the response-unique keys `AllowQueueTransfer`/`JwtClaims` (the field names are `GetString` args, not typed-model members — hence unreachable by the earlier scalar/string search) and read directly: `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (`Token`). `Signature` and `HostHash` are stored via the same GetString helper as every other field and **never read again** — no verify at deserialize time. The static-OpenSSL scenario is excluded by reading, not by import absence. `login-token-signature-check` did not need its xref: it names the auth JWT, and the queue `Token` deserializer provably contains no verify. **No empirical (perishable) test was needed.** §16.15. |
 
 ### Findings proven and not yet used
 
 | ID | Finding | Owner | Notes |
 | -- | ------- | ----- | ----- |
 | **FIND-3** | **`Characters[].PublishedData`** — a base64, zlib-compressed (`eNr…`) blob per character in the `getlogininfo` response. Almost certainly server-published character state. | **Unowned.** | Decompresses without keys, from a response we can already read. Cheap, and it is server→client state in a readable form — the direction §15's work-order note says items 1–7 do *not* give us. Worth a small chunk. §16.3. |
-| **FIND-4** | **`Token.HostHash`** — 32 bytes, base64, in every login-queue response. **Not** a digest of any field tested: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, and SHA-256 over all ordered pairs with four separators, all returned zero (test #58). | **Unowned.** | Low priority **by itself**; it matters only if OPEN-3 resolves toward client-side validation. **Do not chase open-endedly** — the sweep already run is recorded so it is not repeated blind. §16.12. |
+| **FIND-4** | **`Token.HostHash`** — 32 bytes, base64, in every login-queue response. **Not** a digest of any field tested: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, and SHA-256 over all ordered pairs with four separators, all returned zero (test #58). | **Unowned.** | Low priority **by itself**; it matters only if OPEN-3 resolves toward client-side validation. **Do not chase open-endedly** — the sweep already run is recorded so it is not repeated blind. §16.12. **2026-08-31 (S0a):** OPEN-3 resolved NO by trace. `HostHash` **now characterised**: its read-site is in the `Token` deserializer `FUN_1474e5990` (GetString → member +0x24, present-flag +0x2c) — **store, not compare.** It is filed like any other string and never re-read on the connect path. FIND-4's preimage question is moot for S0 (the client never checks it); it remains only a curiosity. §16.15. |
 | **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. |
 
 ### Unverified, carried forward
@@ -2094,3 +2100,156 @@ specific way. §16.11 shows that **is** the design — the client does enqueue, 
 poll — and prediction 1 survived only because admission was immediate at `Position:
 0`. On a queued world the first response carries no address. The prediction was right
 about the endpoint and lucky about the queue depth, and S0 must not inherit the luck.
+
+### 16.15 FINDINGS — S0a (does the client validate the queue token?) — 2026-08-31
+
+Static Ghidra analysis of `NewWorld.exe`, buildid **22469132**, sha256
+`8654f01d324636d9f74f1c793b0cc4a417c3c5fa9847d9913c358ca29e0fdc8e` (matched
+`Bin64.sha256`, PE32+ x86-64, 8 sections). No execution, no hooking, no capture —
+CHARTER §3 satisfied. **Answers OPEN-3.**
+
+**Verdict: NO — CONFIRMED BY DIRECT TRACE (2026-08-31, upgraded from provisional).**
+The client does not verify `Token.Signature` or check `Token.HostHash` before dialling
+`Token.RepAddress`. It treats the address as an opaque `std::string` at connection-object
+offset **+0x1100**, read straight to a socket connect. **S0 is the small branch:** rewrite
+the one `RepAddress` string. **OPEN-3R closed** — the deserializer was opened and read (below).
+
+**This is now traced from the `Signature` read-site itself (OPEN-3R resolved).** The
+load-bearing trace the S0a prompt named ("from the `Signature` read site, follow the
+value") was completed: the queue-response parser and the nested `Token` deserializer were
+located and read. `Signature` and `HostHash` are pulled by the same stock AWS-SDK
+`JsonView` GetString helper as every other field, stored into members, and **never read
+again** — no hash, no verify, no EVP/RSA/bignum, no comparison, no branch on their value.
+The earlier residual (a verify hiding at deserialize time inside static OpenSSL) is
+**excluded by direct reading**, not merely by import-table absence. See "The deserializer
+trace" below.
+
+**Crypto-provider survey (import table).** No asymmetric-signature-verify API is linked:
+- **BCRYPT.DLL** — symmetric + hashing + RNG (`BCryptEncrypt/Decrypt`, `BCryptCreateHash/
+  HashData/FinishHash`, `BCryptGenRandom`, `BCryptImportKey`, `BCryptExportKey`). **No
+  `BCryptImportKeyPair`, no `BCryptVerifySignature`** — CNG cannot RSA-verify here.
+- **ADVAPI32.DLL** (legacy CAPI) — `CryptSignHashW` present (client *signs* its own
+  requests), but **no `CryptVerifySignature`, no `CryptImportKey`** for a server pubkey.
+- **CRYPT32.DLL** — `CryptStringToBinaryA`/`CryptBinaryToStringA` (base64/hex),
+  `CryptProtectData`/`CryptUnprotectData` (DPAPI). No certificate-signature verify.
+- **SECUR32** — `EncryptMessage`/`DecryptMessage` (SSPI channel), not token verify.
+
+So any client-side token verify could only be static-OpenSSL EVP. **None is reached on
+the address path** across the five functions below. Absence of a Windows verify import
+is a point toward NO but not proof on its own — the proof is the deserializer read below, which is why the verdict is confirmed rather than resting on import absence.
+
+**The five address-path functions traced, all crypto-free** (signatures, not bare
+offsets — CHARTER §4):
+
+1. **`FUN_14644a070` — GameConnection state machine.** State enum at obj **+0x1530**;
+   human-readable state-name table at **`PTR_s_Disconnected_1484f9ff0`** (indexed by the
+   state int — a gift for H2). Recovered states: 0 Disconnected, 3 QueueGameLogin,
+   4 WaitingForQueuedLogin, 9 StartREPConnection, 10 WaitingForREPConnection,
+   0xb WaitingForActorGameConnection, 0xc WaitingForSpawnPoint, 0xd WaitingForPlayerSpawn,
+   0xe InGame. **Case 9 is the dial:** reads `RepAddress`(+0x1100) and `worldId`(+0x1120)
+   as `std::string`s, logs `"GameConnectionWrapper: start REP connection RepAddress = %s,
+   worldId = %s"` (`s_..._1484fe8f0`), calls the connect, advances to state 10. No verify.
+2. **`FUN_146425f20` — the REP/DTLS connect.** Builds 6 driver option strings
+   (`FUN_146161a20`), copies `RepAddress` from +0x1100, checks two impersonation feature
+   flags (`javelin.impersonate-character-id/-persona-id`, dev tooling), installs event
+   vtables (`PTR_LAB_1485029e8/1485029b8/148502988`), then calls the driver at obj
+   **+0x1000** via **vtbl+8 (init)** and **vtbl+0x18 (connect)**. Connect args:
+   `RepAddress`, options, **cred `std::string` @ +0x10c0**, **cred `std::string` @ +0x10e0**,
+   personaFlags, bool. No verify; the address goes straight to the socket.
+3. **`FUN_146465060` — queue-login launcher.** Allocates a 0xA8-byte handler stamped
+   vtable `PTR_FUN_148502958`, wires callbacks off `param_2[7]`, hands off to
+   `FUN_146435e40`. Thin async launcher; no parse, no crypto.
+4. **`FUN_146435e40` — request guard/dispatch.** Errors with `"NO_GATEWAY" / "Login is
+   not available"` when no gateway client (obj+0x118==0); else builds a 0x50-byte handler
+   (`PTR_FUN_1485027d8`) and fires it through a `std::function`. Registers the request;
+   no parse, no crypto.
+5. **`FUN_14643c570` — disconnect telemetry reporter.** *Reads* the object for an
+   analytics event; contributes the object layout (below). No crypto.
+
+**Connection-object layout** (decoded from the telemetry key strings in `FUN_14643c570`
+— little-endian ASCII inline constants; this is the S0/S1a/H2 map):
+
+| Offset | Field | Offset | Field |
+| --- | --- | --- | --- |
+| +0x1000 | REP driver object (vtbl +8 init, +0x18 connect, +0xa8 "connected?") | +0x1160 | `persona_id` (std::string) |
+| +0x10c0 | credential std::string → connect | +0x1288 | `match_id` (std::string) |
+| +0x10e0 | credential std::string → connect | +0x1420 | `is_loading` (byte) |
+| +0x1050 | `player` (std::string) | +0x1530 | state enum (int) |
+| +0x1100 | **`rep_address`** (std::string) — the dial target | +0x13f8 | `message` (std::string) |
+| +0x1120 | `world_id` (std::string) | +0x130 | actor-game-connection subobject |
+| +0x1140 | `character_id` (std::string) | | |
+
+**The credential strings at +0x10c0/+0x10e0** handed to the connect are the likely
+carriers of the `Token`/JWT into the world stream — advances P0 prediction 3 / §16.13
+(the `Token` is the world credential presented in the first epoch-1 Carrier message).
+S1a must supply/accept them.
+
+**On the field-name strings (S0a prompt Step 1 falsified — see §13).** The three JSON
+keys were expected as literals the deserialiser clusters on. They are **not**:
+`LoginQueueResponse` — zero matches; `RepAddress` — only inside the case-9 log format
+string; `HostHash `/`TicketId ` — only as trailing-space label text in .rdata; `Signature`
+— present but in an AWS SigV4 / error-code neighbourhood (`SignatureV4`, `X-Amz-Signature`,
+`SignatureDoesNotMatch…`). Reads as a **generic/reflective deserialize** that stores
+fields rather than a bespoke per-field parser that validates them — corroborating NO,
+not proving it. The queue stack RTTI is `Aws::JavelinGatewayService::Model::
+PostGameLoginQueueV2TicketIdRequest` — AWS-SDK, statically linked (matches §16.2).
+
+**The `LoginToken` signature strings are the auth-JWT path, not the queue `Token`.**
+`Javelin.RPC.LoginToken.signature`, `login-token-signature-check`, and
+`@mm_authresult_Denied_LoginTokenSignatureInvalid` all name **LoginToken** (the §16.4
+RS256 login credential); the last is a *server* denial the client only holds a display
+string for. **Not xref'd** — flagged in the S0a prompt as needing an xref and not run, so
+"off the queue-Token path" is believed, not proven. Folded into OPEN-3R.
+
+**`HostHash` — not characterised.** The definition-of-done asked for a store-vs-compare
+trace; none was done (no read-site located). Weight is low now that OPEN-3 leans NO
+(FIND-4 already notes its weight depends on OPEN-3). Left with FIND-4.
+
+**What S0 now is, in the confirmed branch (for scoping without re-opening Ghidra):** a
+TLS-terminating proxy for `d2oeuvxi3kfsrw.cloudfront.net` that rewrites the single
+`LoginQueueResponse.Token.RepAddress` string on the ticket-redeem response, handling the
+poll loop (§16.11). No re-signing: the client never checks the signature, and the world
+server that would (us, under S1a) can accept whatever it likes. **OPEN-3R** is the only
+caveat — cheap to close by reading the deserializer statically at leisure, or empirically
+when S0's proxy is first tested against a live client (perishable, before 31 Jan 2027).
+
+**The deserializer trace (OPEN-3R, resolved 2026-08-31).** The queue response is not a
+typed SDK model — RTTI shows only `Request` classes under `Model@JavelinGatewayService`
+(no `Result`/`Response`/`Token` type), so the body is parsed as a raw `Aws::JsonView`.
+Two functions do it, found by xref of the response-only key literals `AllowQueueTransfer`
+and `JwtClaims` (unique to this response):
+- **`FUN_1474e4f20`** — top-level queue-response parser. Stock has-then-get: `has(key)`
+  (`FUN_147465730`) then a typed getter, per field — `AllowQueueTransfer`(bool),
+  `EstimatedTime`/`Position`/`RefreshInterval`(int), `QueueName`/`RecommendedTransferWorldId`/
+  `TicketId`(string), and **`Token`** → `GetObject` → recurses into `FUN_1474e5990`. No crypto.
+- **`FUN_1474e5990`** — the `Token` deserializer. ~20 fields, all has-then-get-store.
+  **`Signature`** (GetString → member +0x64, flag +0x6c), **`HostHash`** (GetString → +0x24,
+  flag +0x2c), **`RepAddress`** (GetString → +0x5a, flag +0x62), plus `AccountId`,
+  `AccountIsLocked`, `ChannelId`, `CharacterId`, `ClientCapabilities`, `GenerateTime`,
+  `IsPermanentAppOwner`, `IsTrialOwner`, `IsUseTime`, `JwtClaims`, `LocationGroupId`,
+  `LocationId`, `PersonaId`, `SteamAppId`, `SteamUserId`, `TicketId`, `TokenVersion`,
+  `WorldId`. Every field, `Signature` and `HostHash` included, is pulled by the **same**
+  `FUN_1474654e0` GetString helper and stored; **none is read again, hashed, verified,
+  compared, or branched on.** The function returns the moment the last field is stored.
+
+**This is decisive and structural.** It is stock AWS-SDK `JsonView` codegen, which has no
+inline-verification concept: a signature check would have to be a separate explicit call on
+the assembled object, and no such call exists on any path traced (the five consume-side
+functions, the top-level parser, or the Token deserializer). `Token.Signature` is received
+and filed like any other string. **The client cannot reject a rewritten `RepAddress` on
+signature grounds because it never inspects the signature.** OPEN-3 is closed NO by direct
+trace, not inference.
+
+**Token object field map** (from `FUN_1474e5990`, offsets into the Token struct — S1a will
+need these to *emit* a Token the client accepts, and they confirm §16.10's wire fields):
+`Signature` +0x64, `HostHash` +0x24, `RepAddress` +0x5a, `WorldId` +0x86, `TicketId` +0x7a,
+`CharacterId` +0xc, `PersonaId` +0x50, `ChannelId` +0x32, `JwtClaims` +2, `LocationGroupId`
++0x3c, `LocationId` +0x46, `GenerateTime` +0x20, `TokenVersion` +0x83 — each with a paired
+present-flag byte. (Offsets are in the Token sub-object, distinct from the connection-object
+offsets above.)
+
+ Auto-analysis + Windows PE RTTI analyzer
+have run on the b22469132 project. Dispatch-adjacent landmarks passed: the
+GameConnection state machine (`FUN_14644a070`) and its state-name table
+(`PTR_s_Disconnected_1484f9ff0`), the REP driver vtable at obj+0x1000, and the AWS
+Javelin gateway RTTI. `google::protobuf` presence (FIND-2, §10) unre-examined here.
