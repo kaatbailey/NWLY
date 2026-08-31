@@ -9,7 +9,7 @@
 | Section count (every `## ` header, this one included) | **19** |
 | Highest test number (§14) | **59** |
 | Correction row count (§13) | **26** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, **P0, P0b** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b |
 | Open gates | **1** — **OPEN-3** (does the client validate `Token.Signature`?), §15. GATE-1 resolved 2026-08-30 (H3 removed from the critical path; §3, §15) |
 
 **A session's first action is to check these against the working tree.** Not to
