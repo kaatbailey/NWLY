@@ -8,3 +8,4 @@ build/*
 assets/
 extracted/
 datasheets/
+p2_out/blobs/

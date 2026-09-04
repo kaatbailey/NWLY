@@ -92,6 +92,37 @@ the ready-to-paste prompt for each chunk.
 > T5/§12B. Unblocks P2 and S1a's send-side. No finding altered, no chunk ticked or
 > un-ticked — this only adds a prompt and points the Order at it.
 
+> **Seventh amendment, 2026-09-04 — H2 and P2 both complete, and TWO FALSE `[x]`
+> MARKS REPAIRED. This is the failure this file's own repair note describes,
+> arriving a third time and in its worse form.** On 2026-08-30 the recorded failure
+> was rows sitting at `[ ]` after completion. This time both rows were **already
+> ticked `[x]` while their notes still routed a session to go run them** — H2's read
+> "**NEXT — ready to run 2026-08-31**" and P2's carried no verdict, no date and no
+> STATE pointer, only pre-work planning text. A ticked row with a "go run this" note
+> is worse than an unticked one: the tick suppresses the reader's suspicion while the
+> note supplies the wrong instruction. CHARTER §6.5's corollary names the tick
+> half — *a chunk row is never ticked on the strength of remembered work* — and
+> §6.4(1) names the other: a row is not ticked until it carries **a pointer to the
+> STATE section**.
+>
+> Changes: **H2 row rewritten** with its DONE verdict and a pointer to STATE §17;
+> **P2 row rewritten** with its DONE verdict and a pointer to STATE §17.9, and
+> **renamed** — it was still titled "Message-type census," which H2 actually
+> performed (§17.5) and which P2 had been repurposed away from months of drift ago
+> (STATE §15 work-order item 2 has called it "Protobuf descriptor extraction" since
+> 2026-08-30). **`P2_PROMPT.md` added to the standalone-prompt inventory** — it was
+> missing, the same failure CHARTER §6.7 names and this file has now recorded three
+> times. Order items 3 and 4 marked DONE; the closing "Next is H2 or S0" superseded.
+> The "what this order does not yield" paragraph **corrected**: it named FIND-2 as
+> the substitute for observing the inbound half, and FIND-2 closed **negative**.
+>
+> **The one routing change that matters: Track P is retargeted off protobuf.** P2
+> found no game protocol in any descriptor (STATE §17.9). The world stream is
+> GridMate `ReplicaChunk` marshalling — for which **we hold the source** at
+> `7d4f1ee6`. **P5's dependency is corrected from `T1, H4` to `T1` alone**: reading
+> the fork's marshalers needs no reflection reader and no capture, so H4 is an
+> accelerator, not a gate. P5 is promoted to the Track P front.
+
 > **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
 > Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
 > missing); the Standing environment notes filled in with real values; completed
@@ -114,6 +145,95 @@ the ready-to-paste prompt for each chunk.
 5. You fold the findings into `STATE.md` — adding, never deleting — and tick the
    chunk here.
 
+### The two commands that bracket a session — added 2026-09-04
+
+**Run `python3 check_docs.py` at the start of a session and again before
+`git push`.** It is the mechanical form of CHARTER §6, and it exists because
+**every failure it catches already had a rule written against it and the rule was
+violated anyway** — three times for the prompt inventory, three times for stale
+router rows. CHARTER §6.2's insight generalises: a session cannot be expected to
+remember seven closing steps, but it can be expected to run one command.
+
+```fish
+cd ~/Documents/NWLY; and git pull
+python3 check_docs.py          # START — before believing your inputs
+#   ... run the chunk ...
+python3 check_docs.py          # END — before believing you are done
+```
+
+It checks: STATE's four freshness numbers against the file · no duplicate section
+numbers · **STATE and CHUNKS naming the same complete chunks** · every `[x]` row
+carrying a verdict, a date and a STATE pointer · **no `[x]` row still routing a
+session to run it** · every `*_PROMPT.md` inventoried, and present on disk · every
+complete chunk's prompt carrying a DONE banner · no completed chunk named as
+"Next is" · every §15 open item owned · CHARTER §1's no-regeneration rule intact.
+
+**A FAIL means stop and resolve it. It does not mean proceed carefully.**
+
+### What the owner does, in order — the closing sequence
+
+The session writes findings; **you** close the chunk. Do these in this order,
+because they fail differently (CHARTER §6.4 — router before ledger):
+
+| # | Do this | Why this order |
+|---|---|---|
+| 1 | **Tick the row in this file**, with the verdict, the date, and a `STATE §x` pointer | A stale router **misdirects** the next session, which has one chunk and no way to notice the contradiction. A stale ledger only clutters. |
+| 2 | **DONE banner on the `*_PROMPT.md`**, and strike through — never delete — every claim inside it the chunk falsified | §6.4(2)(3). The next reader of that prompt must not act on a falsified premise. |
+| 3 | **Add the prompt file to the standalone inventory above** if it is not already there | §6.7. Missed three times. This is now checked. |
+| 4 | **Fold FINDINGS into `STATE.md`** — add a section, add correction rows for anything overturned, update §15's register | §6.5: unwritten work did not happen. |
+| 5 | **Update STATE's freshness header** — date, commit, section count, highest test, correction count | §6.2. All four, or the next session halts on a false alarm. |
+| 6 | **Run `check_docs.py`. Then `git push`.** | The push is what makes it real for the next session (§6.1, §6.3). |
+
+**Three rules that are easy to get wrong:**
+
+- **A `[x]` with a "go run this" note is worse than a `[ ]`.** It happened to both
+  H2 and P2 on 2026-09-04. The tick suppresses the reader's suspicion while the
+  note supplies the wrong instruction. **If you tick a row, rewrite its note in the
+  same edit** — they are one action, not two.
+- **Never tick a row from memory** (§6.5 corollary). If the evidence is not written
+  down, the row stays open.
+- **A chunk that falsifies its own premise is COMPLETE, not partial**, provided its
+  definition of done has an "or confirmed absent" branch and the negative is
+  recorded with evidence. P2 is the worked example. Residuals go to §15 with an
+  owner; that is how a chunk closes cleanly rather than staying open forever.
+
+**If a session hands you a rewritten `CHARTER.md`, refuse it** (§1). Amendments to
+the charter are proposed as a separate file and applied by you, by hand.
+
+### What the SESSION owes you at the end — the HANDOFF block
+
+**A session must end with a HANDOFF block and nothing after it.** Not a summary,
+not analysis, not "and here are some thoughts on next steps." Fixed shape, plain
+imperatives, **ten lines maximum**:
+
+```
+HANDOFF — <chunk id> — <verdict in five words or fewer>
+  1. CHUNKS.md  — <exact edit>
+  2. <FILE>     — <exact edit>
+  3. STATE.md   — <exact edit>
+  Run: python3 check_docs.py    then: git push
+  Not done: <anything the session could not finish, or "nothing">
+```
+
+**Why this is a rule.** On 2026-09-04 a session did every piece of the work
+correctly and then reported it in several hundred words of reasoning with the
+owner's action items distributed through the prose. The owner had to *mine* the
+response for his own to-do list. **Findings are the session's product; the action
+list is the owner's, and it must be separable in one glance.** Analysis belongs
+above the HANDOFF block, and the block is the last thing in the message.
+
+**The session does not get to decide the block is unnecessary.** If everything is
+already applied and `check_docs.py` is green, the block says so in one line. An
+empty HANDOFF is information; an absent one is the owner reading paragraphs to
+find out whether he has work.
+
+**Corollary — the session runs `check_docs.py` itself where it can**, and derives
+the HANDOFF block from the output rather than from memory. `--close` prints the
+action list in exactly the form the block needs. A session that cannot reach the
+repository says so plainly and writes the block from what it knows, marked as
+unverified — it does **not** claim to have run a check it did not run (CHARTER
+§6.3: claims about our own repository are findings and obey §4).
+
 **Never paste more than one chunk prompt.** A session that can see three chunks
 will half-do all three and hand you back something none of them defined as done.
 
@@ -123,12 +243,16 @@ document, it should be the charter.
 
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
 its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`,
-**`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`**, **`H2_PROMPT.md`** — the
+**`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`**, **`H2_PROMPT.md`**,
+**`P2_PROMPT.md`** — the
 first added 2026-08-30 after it was missing from this list while P0 ran, which is the
 same "a prompt that exists only on one machine cannot be handed to anything" failure
 CHARTER §6.7 names; the latter three added the same day **at creation time**, which is
 the practice that failure was supposed to teach — `H2_PROMPT.md` created 2026-08-31,
-before H2 was started).
+before H2 was started. **`P2_PROMPT.md` added 2026-09-04 — retroactively, after P2
+had already run, which is the same omission this list exists to prevent and the
+third time it has happened. The prompt file existed; it was simply never inventoried
+here.**).
 Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
 not the summary.
@@ -165,7 +289,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 |       | Chunk                                          | Depends on | Deliverable                                                          |
 | ----- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------- |
 | `[ ]` | **H1** Frida crypto hook on the reference build | T2, T4     | `SSL_read`/`SSL_write` plaintext logged from a target we control. **Now also: prove the signature scan here** — see the prompt |
-| `[x]` | **H2** Map the inbound world-message path and its dispatch (static) | T1, ~~(T5)~~ **T5 done** | **NEXT — ready to run 2026-08-31.** Ghidra, warm from S0a (same b22469132 project, RTTI done). Walk `recvfrom → SSL_read → GridMate Carrier → dispatch`; identify the routing mechanism (type-keyed table / switch / ReplicaManager marshaler) and enumerate message types; mark where protobuf enters (FIND-2). Scope ambitiously — a primary source of protocol structure, not just a hook point. Falsification check armed: prediction that transport matches reference GridMate source down to the message boundary; if not, T5/§12B strained. Unblocks **P2** (message census) and **S1a** (send-side). Prompt: `H2_PROMPT.md` |
+| `[x]` | **H2** Map the inbound world-message path and its dispatch (static) | T1, ~~(T5)~~ **T5 done** | **DONE 2026-09-04. World-message dispatch map complete. STATE §17.** Inbound path resolved end to end (`WSARecvFrom → TransportLayerLibUV → TransportLayerGridMate → REPConnection::OnConnect/OnRecv → Aws::JavelinGatewayService`); **stock/game boundary identified at `REPConnection`**; dispatch confirmed **registration-based, not a switch** (prediction 2 confirmed); **10 Javelin Gateway message types enumerated by RTTI**; **GameConnection state table complete, all 15 states**; signatures recorded. Opened OI-H2-1…5. **LibUV finding strains T5/§12B's "zero catalogued exceptions" wording** — precision gap, not falsification (§17.1). ~~**NEXT — ready to run 2026-08-31.** Ghidra, warm from S0a (same b22469132 project, RTTI done). Walk `recvfrom → SSL_read → GridMate Carrier → dispatch`; identify the routing mechanism (type-keyed table / switch / ReplicaManager marshaler) and enumerate message types; mark where protobuf enters (FIND-2). Scope ambitiously — a primary source of protocol structure, not just a hook point. Falsification check armed: prediction that transport matches reference GridMate source down to the message boundary; if not, T5/§12B strained. Unblocks **P2** (message census) and **S1a** (send-side).~~ **One H2 claim has since been corrected: §17.5's "protobuf choke point" was wrong (P2, STATE §13, §17.9).** Prompt: `H2_PROMPT.md` |
 | `[~]` | **H3** Crypto/dispatch hook on retail           | H1, H2, T2 | **LAST RESORT — deliberately deprioritised 2026-08-30, not blocked.** Only if P0/S0/S1a/H2/H4 are exhausted. One attempt; EAC prevention is terminal. STATE §3, §15 |
 | `[ ]` | **H4** The reflection reader (`SerializeContext`) | T1       | **Decision gate + prototype.** Only if the ABI proves traversable    |
 
@@ -192,10 +316,10 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 | `[x]` | **P0b** Decrypt the queue response       | P0         | **DONE 2026-08-30. VERDICT: COMPLETE.** A cold launch (Steam logged out and back in) forced a **full** TLS handshake on the queue stream; the key was logged and the response decrypted. **The world address is `LoginQueueResponse.Token.RepAddress`, a literal `"ip:port"` string**, at frame 1660 — 63 frames before the client's first DTLS ClientHello to that host:port, and present in **exactly one** of 20+ exported HTTP objects. **OPEN-1 closed. OPEN-2 closed** (`GUID2` = the queue ticket id). Predictions 1–4 all confirmed. **Also found: the queue is a poll loop**, which changes what S0 must answer. STATE §16.9–§16.14, tests #55–#59. Prompt: `P0B_PROMPT.md`. ~~**NEW 2026-08-30.** The one thing standing between here and S0.** Re-capture forcing a **full** TLS handshake on the queue connection so the keylog records its key. Hypothesis: the callback fires on full handshakes only, so resumed sessions go unlogged (**DEF-2**). **Must be a cold launch** — login is Steam-inherited, so a fresh session replays the whole ticket→JWT→STS chain in-window *and* forces the full handshake; a resumed session gives neither. ~15 minutes, retryable — **but only until 31 Jan 2027.** STATE §16.7, test #54~~ |
 | `[ ]` | **P0c** Decode `PublishedData`           | P0         | **NEW 2026-08-30. Cheap, and it is server→client state.** Base64 + zlib (`eNr…`) blobs in `Characters[]` of the `getlogininfo` response — a response we can **already read**, no keys and no new capture needed. FIND-3, STATE §16.3 |
 | `[ ]` | **P1** Handshake sequence                 | ~~T5~~ **T5 done**, ~~H3~~ **S1a or H3** | The connect exchange, byte-documented. **Scope narrowed — the epoch-0 DTLS half is already byte-documented in STATE §12B; what remains is the GridMate `Carrier` handshake inside epoch ≥ 1.** Reachable from S1a's plaintext for the client→server half without H3 |
-| `[ ]` | **P2** Message-type census                | ~~H3~~ **H2, or S1a, or FIND-2** | The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3 |
+| `[x]` | **P2** ~~Message-type census~~ **Protobuf descriptor extraction (static)** | ~~H3~~ ~~**H2, or S1a, or FIND-2**~~ **H2 (done)** | **DONE 2026-09-04. VERDICT: NEGATIVE — and the negative is the deliverable. STATE §17.9.** Whole-binary scan found **3 `FileDescriptorProto` blobs, none of them game protocol**: `campfire_event_default.proto` (Amazon Campfire telemetry — 1 message, 1 nested context struct, 1 enum), plus stock `google/protobuf/empty.proto` and `google/protobuf/descriptor.proto`. **No Javelin descriptor. No `service` block. `application/x-protobuf` = 0 against `application/json` = 236.** **All three predictions in `P2_PROMPT.md` falsified**, including prediction 3 ("the single most valuable find P2 can make"). Consequences: **FIND-2 closed negative**; **§17.5's "protobuf choke point" corrected** (STATE §13); **OI-H2-3 answered mundanely** — AWS SDK `XResult` types are non-polymorphic, so no vtable and no RTTI, not an exotic inbound path; **Track P retargeted onto GridMate `ReplicaChunk` marshalling → see P5**. Residual: **OI-P2-1** (registration mechanism unconfirmed — the one definition-of-done bullet not satisfied), **OI-P2-2** (are the 10 Javelin types the same REST routes P0 decoded?). Tests #63–#65. ~~The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3.~~ **Note the rename: the message-type census was performed by H2 (§17.5), not by P2.** Prompt: `P2_PROMPT.md` |
 | `[ ]` | **P3** Position/movement message          | ~~H3~~ **S1a or H3**, P2 | The controlled-walk experiment, decoded. Outbound position messages arrive as plaintext at an S1a server; H3 only adds the inbound half |
 | `[ ]` | **P4** Initial world-state sync           | **H3**, P2 | The login state dump. **Genuinely needs H3** — this one is server→client, the direction S1a cannot observe. Expect to construct rather than capture it |
-| `[ ]` | **P5** Replica/chunk model                | T1, H4     | How replicated objects map to the wire          |
+| `[ ]` | **P5** Replica/chunk model                | ~~T1, H4~~ **T1 — source-readable now** | **PROMOTED 2026-09-04 to the Track P front, by P2's negative result (STATE §17.9).** How replicated objects map to the wire. **P2 ruled protobuf out**, and the world stream is GridMate `ReplicaChunk` marshalling (`ReplicaChunk` 23, `InitializeReplicatedFields` 94, plus §10's `VTransformReplicaChunk` / `VTriggerAreaReplicaChunk` / `ScriptComponentReplicaChunk`). **We hold the source for it** — the fork at `7d4f1ee6`, which already builds. **Dependency corrected: H4 is an accelerator, not a gate.** Reading `Marshaler` / `DataSetBase` / `CompressionMarshal.h` / `MathMarshal.h` in the fork needs no reflection reader, no capture, and no running client. **CHARTER §2 paying off: on this layer the reference build is not merely the check, it is the primary source.** Immune to the 2027-01-31 sunset. Chunk types are identified on the wire by `AZ::Crc32` of the chunk name |
 
 ### Track S — Server. Speak back to the client.
 
@@ -314,10 +438,18 @@ get pursued or recorded.
    residual. The Ghidra project is analysed and warm for H2 (RTTI ran; the GameConnection
    state machine, the connect, the object layout, and both JSON deserializers are
    landmarked in §16.15).
-3. **H2** — static Ghidra. Scope it **ambitiously**: a primary source of protocol
+3. ~~**H2** — static Ghidra. Scope it **ambitiously**: a primary source of protocol
    structure, not just a hook-targeting step. File-based, no deadline. **Shares S0a's
-   instrument** — if S0a ran first, H2 starts warm.
-4. **P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. File-based.
+   instrument** — if S0a ran first, H2 starts warm.~~ **DONE 2026-09-04, STATE §17.**
+   Dispatch mapped, 10 message types enumerated, state table complete. Opened
+   OI-H2-1…5; one of its claims (the "protobuf choke point") since corrected by P2.
+4. ~~**P2 / FIND-2** — protobuf `FileDescriptorProto` extraction. File-based.~~
+   **DONE 2026-09-04, STATE §17.9. NEGATIVE RESULT.** 3 descriptors, none game
+   protocol; no Javelin schema, no `service` block. **FIND-2 closed negative**;
+   §17.5 corrected; OI-H2-3 answered. **Track P retargets onto P5** (GridMate
+   `ReplicaChunk` marshalling, source-readable from the fork).
+4a. **P5** — replica/chunk model. **The new Track P front**, promoted by item 4's
+   negative result. Read the fork's marshalers; no capture, no client, no H4.
 5. **P0c** — decode `PublishedData` (FIND-3). Cheap, no capture, server→client state.
 6. **S0** — redirection feasibility. ~~**Unblocks once P0b lands.**~~ **UNBLOCKED.**
    Requirements in **STATE §16.13**, revised from §16.6. Proxy the queue endpoint, not
@@ -338,15 +470,28 @@ here still works in February 2027; P0b does not.~~ ~~**Superseded — P0b is don
 is now the cheapest thing on the board that changes a downstream decision: it is
 static, needs no client and no network, and it determines whether S0's proxy design
 survives contact. Running it first may save S0 an entire wasted iteration, and it
-warms H2's instrument either way.~~ **Next is H2** (static Ghidra, now warm from S0a —
+warms H2's instrument either way.~~ ~~**Next is H2** (static Ghidra, now warm from S0a —
 scope it ambitiously) **or S0** (design the field-rewrite proxy on the small branch,
-carrying OPEN-3R). Both file-based, no deadline. **S0 has no perishable thread left** — OPEN-3 was closed
+carrying OPEN-3R). Both file-based, no deadline.~~ **Superseded 2026-09-04 — H2 and
+P2 are both done (STATE §17, §17.9).** **Next is P5** (read the fork's `ReplicaChunk`
+marshalers — the Track P front now that protobuf is ruled out, and the cheapest
+unexplored source of protocol structure on the board) **or S0** (design the
+field-rewrite proxy) **or P0c** (decode `PublishedData`, FIND-3 — still the cheapest
+server→client state we can already read). **OI-P2-2 is cheaper than any of them and
+could force another correction**: diff the 10 Javelin type names against `p0_cold`'s
+routes; if they match, §17.5's "world message layer" framing is wrong too and the
+inbound Javelin schema was already in P0's captures. **S0 has no perishable thread left** — OPEN-3 was closed
 statically, so S0 needs no live-backend confirmation to commit to its design.
 
 **What this order does not yield** is the server→client direction in captured form.
 Items 1–7 give the client's outbound messages plus whatever comes out of the binary;
-the inbound half is what S-track must construct regardless, with H2 and FIND-2 as
-the substitute for observing it.
+the inbound half is what S-track must construct regardless, ~~with H2 and FIND-2 as
+the substitute for observing it.~~ **CORRECTED 2026-09-04: FIND-2 is not a substitute
+for anything — it closed negative (STATE §17.9). The substitutes that remain are H2's
+dispatch map (§17), the GridMate fork source for the replica model (P5), and P0's
+already-decrypted auth traffic for the Javelin JSON responses (OI-P2-2).** The
+server→client half is now the project's largest single unknown, and none of the
+routes to it are perishable.
 
 **D1 can start whenever**; it has a free head start from the `pins/22469132/Bin64.sha256`
 baseline (STATE §5), and it earns its keep the moment any offset is hardcoded.
@@ -1014,11 +1159,21 @@ Write the full prompt when the chunk comes up, using the shape above.
   13-byte `RecordHeader` and 12-byte `HandshakeHeader`. What P1 still owes is the
   **GridMate `Carrier` handshake inside epoch 1** (`DefaultHandshake`, connection
   request/ack, and the `Carrier` header on real traffic), and that is what needs H3.
-- **P2 Message-type census.** Turn H3's dispatch-table hits into a list of known
-  message types with frequencies. **T1 found `google::protobuf::Reflection::` in
-  `NewWorld.exe` itself** (not in EAC or Vivox — both scanned, both zero), so
-  embedded `FileDescriptorProto` blobs may hand over the schema rather than
-  requiring reverse engineering. This is where they get extracted. STATE §10.
+- **P2 Protobuf descriptor extraction. ✅ DONE 2026-09-04 — see `P2_PROMPT.md` and
+  STATE §17.9. VERDICT: NEGATIVE.** The blobs are real and carry no game protocol:
+  Campfire telemetry plus two stock well-known types. `descriptor.proto` is present
+  only because `google::protobuf::Reflection` requires it — **that is the entire
+  explanation for T1's flag**, and the flag rested on a single `GOOGLE_CHECK` assert
+  string. ~~Turn H3's dispatch-table hits into a list of known message types with
+  frequencies. **T1 found `google::protobuf::Reflection::` in `NewWorld.exe`
+  itself** (not in EAC or Vivox — both scanned, both zero), so embedded
+  `FileDescriptorProto` blobs may hand over the schema rather than requiring reverse
+  engineering. This is where they get extracted. STATE §10.~~ **The message-type
+  census this bullet described was performed by H2 instead (§17.5, 10 types by
+  RTTI), and the H3 dependency was stale twice over.** Instrument kept:
+  `p2_scan.py` — scans for the `FileDescriptorProto` artefact rather than a
+  registration function, so it is protobuf-version-independent; validated against
+  synthetic, 171 MB positive and 40 MB negative controls before use (test #63).
 - **P3 Position/movement message.** The controlled-walk experiment (walk a straight
   line at constant speed; the smoothly-varying float triple or quantized int is the
   position). GridMate's transform marshalers quantize — see `CompressionMarshal.h`
@@ -1026,11 +1181,21 @@ Write the full prompt when the chunk comes up, using the shape above.
   and a walking window**, so the timing/size delta is a free head start.
 - **P4 Initial world-state sync.** The login state dump is the biggest, most
   informative single message — capture it with a log-out/log-in cycle.
-- **P5 Replica/chunk model.** Map `ReplicaChunk` types (identified on the wire by
-  `AZ::Crc32` of the chunk name) to the descriptor table dumped via H4. **Noticed
-  during D2:** `object-stream-converter` and `asset-catalog-parser` in the
-  new-world-tools kit would likely say a lot about the replicated-object model.
-  Recorded, not acted on. STATE §11.
+- **P5 Replica/chunk model. ← THE TRACK P FRONT, promoted 2026-09-04 by P2's
+  negative result (STATE §17.9).** Map `ReplicaChunk` types (identified on the wire
+  by `AZ::Crc32` of the chunk name) to their marshalers. ~~to the descriptor table
+  dumped via H4~~ — **H4 is no longer a gate.** With protobuf ruled out, this is the
+  world stream's actual encoding, and **the source is in the fork at `7d4f1ee6`**:
+  `Marshaler` / `DataSetBase` / `CompressionMarshal.h` / `MathMarshal.h` under
+  `dev/Code/Framework/GridMate/`. Read the source first (CHARTER §4, *prefer the
+  source to the sample*), then confirm against the retail binary's 23 `ReplicaChunk`
+  and 94 `InitializeReplicatedFields` references (STATE §10, §17.9). **No capture, no
+  client, no hook, no deadline** — the strongest position the project has had on the
+  inbound half. Note P3 depends on this: GridMate's transform marshalers **quantize**,
+  so a raw float triple is the wrong thing to look for. **Noticed during D2:**
+  `object-stream-converter` and `asset-catalog-parser` in the new-world-tools kit
+  would likely say a lot about the replicated-object model. Recorded, not acted on.
+  STATE §11.
 - **S1–S3.** Server work, all blocked on the corresponding P-track chunks. Prompts
   when P1/P3/P4 resolve. Content source is ready (D2). **T5 handed S-track three
   hard requirements and removed one (STATE §12B):** the server must run GridMate's

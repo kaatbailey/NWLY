@@ -1,0 +1,4 @@
+idx	proto_path	package	va	file_off	size	section	messages	enums	services	confidence	signature_first16
+0	campfire_event_default.proto		0x1486f5b60	0x86f4360	1407	.rdata	4	0	0	exact	0a1c63616d70666972655f6576656e74
+1	google/protobuf/empty.proto	google.protobuf	0x1495ab7c0	0x95a9fc0	190	.rdata	1	0	0	exact	0a1b676f6f676c652f70726f746f6275
+2	google/protobuf/descriptor.proto	google.protobuf	0x1495b3330	0x95b1b30	6028	.rdata	27	0	0	exact	0a20676f6f676c652f70726f746f6275

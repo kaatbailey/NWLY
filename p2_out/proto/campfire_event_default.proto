@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+message CampfireEventDefault {
+  message ContextData {
+    string world_id = 1;
+    string hub_id = 2;
+    string player = 3;
+    string guild_id = 4;
+    string character_id = 5;
+    string persona_id = 6;
+    string prefabName = 7;
+    sint32 territory_id = 8;
+    sint32 poi_id = 9;
+    float xpos = 10;
+    float ypos = 11;
+    float zpos = 12;
+    string host_world_id = 13;
+    sint32 level = 14;
+    optional bool IsGM = 15;
+    double owned_expansion = 16;
+    optional CampfireEventDefault.FactionType faction_type = 17;
+    optional bool pvp_flag_state = 18;
+    string objective_id = 19;
+    string test_new = 20;
+    string test_new_2 = 21;
+  }
+  enum FactionType {
+    None = 0;
+    Faction1 = 1;
+    Faction2 = 2;
+    Faction3 = 3;
+  }
+  uint32 version = 1;
+  string id = 2;
+  string type = 3;
+  int64 sourceTimeMillis = 4;
+  optional string utcOffset = 5;
+  optional string userId = 6;
+  optional string sessionId = 7;
+  optional string applicationName = 8;
+  optional string applicationVersion = 9;
+  optional string platformName = 10;
+  optional string platformVersion = 11;
+  optional string locale = 12;
+  optional string graphName = 13;
+  repeated CampfireEventDefault.MetricsEntry metrics = 14;
+  repeated CampfireEventDefault.AttributesEntry attributes = 15;
+  optional CampfireEventDefault.ContextData context = 16;
+  optional int32 eventPriority = 17;
+}

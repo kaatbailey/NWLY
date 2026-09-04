@@ -5,11 +5,11 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-09-04** |
-| Written against commit | a2d2fcd |
+| Written against commit | **FILL ON COMMIT** (parent: a2d2fcd) |
 | Section count (every `## ` header, this one included) | **20** (§16.15 is a `###` subsection, not a new `## `) |
-| Highest test number (§14) | **62** |
-| Correction row count (§13) | **28** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, **H2** |
+| Highest test number (§14) | **65** |
+| Correction row count (§13) | **29** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, **P2** |
 | Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
@@ -183,11 +183,23 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
   transport.** P1–P4 all confirmed. Offline: two pcaps + source, no client launch,
   no hooks, no decryption. §12B.
 
+- **P2 — protobuf descriptor extraction (retail, static).** Scanned the whole
+  binary: **3 `FileDescriptorProto` blobs, none of them game protocol** — one
+  Campfire telemetry schema plus two stock protobuf well-known types. No Javelin
+  descriptor, no `service` block, `application/x-protobuf` = 0 against
+  `application/json` = 236. **FIND-2 closes negative**, §17.5's "protobuf choke
+  point" is corrected (§13), and **OI-H2-3 is answered mundanely** (AWS SDK
+  `XResult` types are non-polymorphic → no RTTI). Track P retargets onto GridMate
+  `ReplicaChunk` marshalling, for which we hold the source. §17.9.
+
 **Open, in dependency order:** H1 → H3 → P-track → S-track. D1 can start any
 time. **T3 complete 2026-08-29 (§12A). T5 complete 2026-08-29 (§12B) — the
 T-track is finished. H2 complete 2026-09-04 (§17) — world-message dispatch map
 done, Track P prioritisation and S1a handoff written. H-track active front is
-now H1.**
+now H1. P2 complete 2026-09-04 (§17.9) — protobuf ruled out as a route to the
+world protocol; Track P retargeted onto GridMate replica marshalling, which is
+readable from the reference fork source and is therefore immune to the 2027-01-31
+sunset.**
 
 **Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
@@ -1523,6 +1535,7 @@ claim adds a row here rather than deleting the claim.
 | "Same world **host** across captures a day apart but a **different port each session** (`44727` → `24083`)." — §16.5, prediction 4 (P0, 2026-08-30). | **THE PORT CLAIM IS WRONG AS STATED.** P0b observed `35.71.190.194:`**`44727`** again — the same port as `p0_login`, a day later, across a full Steam re-login and a cold launch. Three datapoints now read `44727` → `24083` → `44727`, which is not per-session assignment; it looks like a small set of listeners the client is dealt from. Cause of the error: two datapoints that happened to differ were read as a per-session *rule* rather than as two draws from an unknown distribution. **Consequence: none for S0** — the address is delivered explicitly in `Token.RepAddress` either way, so its stability was never load-bearing. Recorded because §12A was corrected on the strength of this claim. §16.10. |
 | "Separately **falsified in the strong form**: the address is *not* in any readable auth body — exhaustive search across all exported HTTP objects and decrypted records … returned nothing but two false hits inside `.dds` textures." — §16.5, prediction 1 (P0, 2026-08-30). | **TRUE AS SCOPED, SUPERSEDED AS PHRASED.** The search was exhaustive over the bodies readable *at that time*, and the one body that carries the address was precisely the one that did not decrypt. P0b decrypted it; the address is there, in plaintext ASCII, as `Token.RepAddress`. This row is not an error — the scope qualifier was doing real work — but the phrase "not in any readable auth body" invites the wrong generalisation on re-reading, and **prediction 1 is now CONFIRMED** (§16.10, §16.14). Lesson, and it is §16.8 from the other direction: an exhaustive search is bounded by what the instrument could open, and that bound belongs **inside the sentence**, not in a caveat elsewhere. |
 
+| "**Protobuf choke point (FIND-2 / P2):** All 10 types go through AWS SDK model serialization. The move-constructor family (`FUN_146406a90` and siblings) embed named Javelin model vftables directly. P2 should target the AWS SDK `SerializePayload` / `GetBody` path on these model types to locate the protobuf schema boundary." — §17.5 (H2, 2026-09-04). | **FALSE — there is no protobuf schema boundary on that path, and no protobuf anywhere near the Javelin models.** P2 scanned the entire binary the same day and recovered **3** `FileDescriptorProto` blobs: `campfire_event_default.proto` (Campfire telemetry), `google/protobuf/empty.proto`, `google/protobuf/descriptor.proto`. No Javelin descriptor, no `service` block, **`application/x-protobuf` = 0** against **`application/json` = 236**. The AWS SDK path is **JSON**, which §16.15 had already demonstrated from the other direction by reading queue-`Token` fields out of the stock `JsonView` GetString helper — the evidence was in this file before H2 wrote the claim. Protobuf in `NewWorld.exe` serves Campfire telemetry and nothing else. **Lesson: "X and Y are both present in the binary" is not evidence that X serialises Y.** §17.9. |
 ---
 
 ## 14. Test / capture log
@@ -1594,6 +1607,9 @@ result — so no test is silently retried and no result is remembered wrong.
 | 60 | **S0a** import-table survey of `NewWorld.exe` (b22469132) for an asymmetric-signature-verify API, via Ghidra Symbol Tree → Imports. | If the client verifies the queue `Token`, a verify API (CNG `BCryptVerifySignature`, CAPI `CryptVerifySignature`, or a static-OpenSSL EVP) is reachable. | **No Windows verify API imported.** BCRYPT has symmetric/hash/RNG + `BCryptImportKey/ExportKey` but **no `BCryptImportKeyPair`/`BCryptVerifySignature`**; CAPI has `CryptSignHashW` (signing) but no verify/`CryptImportKey`; CRYPT32 is base64+DPAPI only. Any client verify could only be static OpenSSL. Point toward NO, not proof. §16.15. |
 | 61 | **S0a** traced the five functions on the `RepAddress` consume path (dial `FUN_14644a070` case 9, connect `FUN_146425f20`, launcher `FUN_146465060`, guard `FUN_146435e40`, disconnect-report `FUN_14643c570`) for any read of `Signature`/`HostHash` or any verify/EVP call. | Prediction 1 (load-bearing): `RepAddress` flows to a socket connect; `Signature`/`HostHash` are stored-and-forwarded; no crypto on the path. | **Consistent with prediction 1. None of the five reads a `Signature`/`HostHash` field or calls a verify;** `RepAddress` (obj +0x1100) goes straight to the driver connect. **But the `Signature` read-site and the deserializer write-site were never located** (register-relative std::string assigns defeat scalar/string search), so this is the consume side only — inferred NO, residual OPEN-3R. §16.15. |
 | 62 | **S0a (OPEN-3R)** located and read the queue-response deserializer, found via xref of the response-unique keys `AllowQueueTransfer`/`JwtClaims`: `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (`Token`). | Prediction 1, direct form: `Signature`/`HostHash` are `GetString`-and-store, no verify at parse time. | **CONFIRMED. Both are pulled by the stock AWS-SDK `JsonView` GetString helper (`FUN_1474654e0`), stored into Token members (Signature +0x64, HostHash +0x24, RepAddress +0x5a), and never read/hashed/verified/compared again.** No inline verification — structurally impossible in SDK codegen. Upgrades OPEN-3 from provisional to traced NO; closes OPEN-3R. §16.15. |
+| 63 | **P2** instrument validation of `p2_scan.py` **before** it was pointed at retail (CHARTER §2/§4): (a) synthetic Javelin-shaped descriptor with nested messages, `oneof`, enum, repeated, defaults and a `service` block, butted directly against adjacent `.rdata`; (b) 171 MB haystack with six **real** Google descriptors planted at known offsets; (c) 40 MB adversarial noise seeded with decoy `.proto` paths and hand-crafted anchors. | A scanner that finds descriptors in noise is worthless; one that misses them at scale is worse. Expect full recall on (a)/(b) and zero hits on (c). | **PASSED — after two defects the controls caught.** (a) 2/2, exact offsets/VAs/sizes recovered **without any size constant**, service block round-tripped. (b) **6/6**, all sizes exact, 2 s runtime. (c) **0 false positives**. Defects found and fixed: **O(n²) extent recovery that hung** on adversarial input (now single-pass), and **35,081 false positives** — a bare `.proto` path in a strings table preceded by a byte that happens to be its length is a valid *name-only* `FileDescriptorProto`; fixed with a substance gate (must declare ≥1 message/enum/service/extension), 35,081 → 0 with no loss of recall. §17.9. |
+| 64 | **P2** whole-binary `FileDescriptorProto` scan of `NewWorld.exe` b22469132 (179,204,176 bytes, image base `0x140000000`) from the pin, `.rdata`/`.data`. | P2_PROMPT predicted 20–100 registration call sites, response types present in the blobs, and a `service JavelinGatewayService` block ("the single most valuable find P2 can make"). Runbook predicted the opposite: infrastructure namespaces only, no service block. | **All three P2_PROMPT predictions FALSIFIED; runbook P2-B/C confirmed.** **3 blobs, exact confidence:** `campfire_event_default.proto` (VA `0x1486f5b60`, 1407 B, 4 msgs), `google/protobuf/empty.proto` (`0x1495ab7c0`, 190 B), `google/protobuf/descriptor.proto` (`0x1495b3330`, 6028 B). **0 service blocks. 0 messages named `*Result`/`*Response`/`*Notification`/`*Event`.** Campfire's 4 messages are really 1 message + 1 nested struct + 2 synthetic map entries. §17.9. |
+| 65 | **P2** serialization-shape string survey of the same binary (`--diagnostics`). | If Javelin were protobuf, a protobuf content type and descriptor-registration symbols should be present in proportion to 20 `JavelinGatewayService` hits. | **Javelin is JSON.** `application/json` **236**, `application/x-protobuf` **0**, `application/octet-stream` 0. `JavelinGatewayService` 20. `InitializeReplicatedFields` **94** — matches T1/§10's independently-derived ~94, an instrument cross-check that passed. `ReplicaChunk` 23. **Instrument cap, and it binds: every search string containing `::` was matched literally and therefore misses mangled MSVC RTTI** (`JsonView` is stored as `?…@JsonView@Json@Utils@Aws@@`), so `JsonView`/`DataSetBase`/`Marshaler`/`MessageLite`/`DescriptorPool` = 0 are **artefacts of the search, not absence**. Only bare identifiers and content-type literals from this test are citable. §17.9. |
 
 ---
 
@@ -1628,7 +1644,7 @@ we answer. None of it contacts a running retail client. In rough dependency orde
 | # | Work | Owner chunk | Why it needs no EAC contact |
 | - | ---- | ----------- | --------------------------- |
 | 1 | **Static extraction from `NewWorld.exe`** — dispatch point, handler table, type enum. **DONE (H2, §17, 2026-09-04).** Dispatch mapped, 10 Javelin Gateway message types enumerated, stock/game boundary confirmed, S1a and Track P handoffs written. | ~~**H2**~~ **COMPLETE** | The binary sits on disk. Nothing is running; EAC is not loaded. |
-| 2 | **Protobuf descriptor extraction.** FIND-2: if the embedded `FileDescriptorProto` blobs are real, message schemas come out of the binary with no captured packet at all. Flagged by T1, never extracted. | **P2**, pulled earlier — or folded into H2 | Same: static file inspection. |
+| 2 | ~~**Protobuf descriptor extraction.** FIND-2: if the embedded `FileDescriptorProto` blobs are real, message schemas come out of the binary with no captured packet at all. Flagged by T1, never extracted.~~ **DONE (P2, §17.9, 2026-09-04) — and the blobs are real but carry no game protocol.** 3 descriptors total: `campfire_event_default.proto` (telemetry) + `google/protobuf/empty.proto` + `google/protobuf/descriptor.proto`. No Javelin schema exists to extract. | ~~**P2**~~ **COMPLETE** | Same: static file inspection. |
 | 3 | **Auth-phase decode.** FIND-1: the TCP/443 flow already decrypts via `SSLKEYLOGFILE`. Contains login, server list, session token, and the world-address handoff. Proven decryptable, **never read**. | **P0** (new) | The client writes the keylog itself. We read a file it produced. Nothing is injected or modified. |
 | 4 | **Redirection feasibility.** Can the client be pointed at a world server we run? The address comes from auth, so this depends on 3. Cheap to test and everything below rests on it. | **S0** (new) | A hosts/DNS change on our own machine. |
 | 5 | **The inversion — build the DTLS server.** T5 specified this layer completely (§12B). When the retail client completes a handshake against our server, **we hold the session keys**, and every message it sends arrives as plaintext on our socket. This is the route that replaces H3 for the client→server half. | **S1a** (new) | We are answering on a port. There is no hook, no injection, and nothing EAC is built to observe. |
@@ -1658,8 +1674,10 @@ FIND-2 are the substitute for observing it.
 | ~~**OPEN-3R**~~ **CLOSED** | ~~Residual of OPEN-3: is there a verify at *deserialize* time?~~ | ~~S0~~ | **CLOSED 2026-08-31, same session. Route (a) taken.** The deserializer was located by xref of the response-unique keys `AllowQueueTransfer`/`JwtClaims` (the field names are `GetString` args, not typed-model members — hence unreachable by the earlier scalar/string search) and read directly: `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (`Token`). `Signature` and `HostHash` are stored via the same GetString helper as every other field and **never read again** — no verify at deserialize time. The static-OpenSSL scenario is excluded by reading, not by import absence. `login-token-signature-check` did not need its xref: it names the auth JWT, and the queue `Token` deserializer provably contains no verify. **No empirical (perishable) test was needed.** §16.15. |
 | **OI-H2-1** | **LibUV role — confirm whether `Amazon::Hub::TransportConnectionLibUV` wraps the DTLS/world path or only a parallel HTTP/service channel.** `StartRecv`/`StopRecv` confirmed in imports; T5/§12B's "structurally stock" conclusion holds for the Carrier/crypto layer but the socket driver is LibUV-wrapped, which was not predicted. | **H1** sub-task | If LibUV wraps the DTLS path, T5/§12B needs a precision note ("zero catalogued exceptions in the Carrier layer" rather than "in the transport"). §17.1. |
 | **OI-H2-2** | **`REPConnection::OnRecv` body not resolved statically.** Ghidra treats the entry as an `UndefinedFunction` thunk at `146b717b0`; the actual callable body was not isolated. | **H1** | H1 runtime hook on the vtable slot at `148591750` will confirm the body and its ReadBuffer dispatch logic. §17.2. |
-| **OI-H2-3** | **Server→client response schema absent from RTTI.** No `Result`/`Response` types in the Javelin Gateway RTTI — 10 request types only. Server→client messages are deserialized differently, not instantiated as typed RTTI objects. | **P2** | P2 must locate the inbound schema via the AWS SDK `GetBody`/`SerializePayload` path or via H1 runtime capture. §17.5. |
+| ~~**OI-H2-3**~~ **ANSWERED** | ~~**Server→client response schema absent from RTTI.** No `Result`/`Response` types in the Javelin Gateway RTTI — 10 request types only. Server→client messages are deserialized differently, not instantiated as typed RTTI objects.~~ | ~~P2~~ | **ANSWERED 2026-09-04 by P2, and dissolved rather than transferred. The premise "deserialized differently" was wrong.** Response types are absent from RTTI because AWS SDK for C++ `XResult` classes are **non-polymorphic value types — no vtable, therefore no RTTI**; `XRequest` derives from the polymorphic `AmazonSerializableWebServiceRequest` and so does emit it. "10 requests, no results" is the expected shape of the SDK, not evidence of an exotic inbound path. Corroborated by `application/json` = 236 vs `application/x-protobuf` = 0, and by §16.15 having already read Javelin-family fields out of the stock `JsonView` GetString helper. **The inbound Javelin schema is JSON** and is recoverable from P0's existing plaintext captures or from `.rdata` field-name constants — neither needs a running client. §17.9. |
 | **OI-H2-4** | **Second state-machine function for states 5–8** (`QueryForRemoteConfigClass` through `WaitingForREPRequirements`) not yet located. `FUN_14644a070` only handles states 1–4 and 7–0xe. | **Unowned** | Low priority — these states are pre-connect and do not affect S1a or Track P. §17.6. |
+| **OI-P2-1** | **Registration mechanism unconfirmed (residual of P2-E).** P2's 3 blobs were located **as data**; nothing yet proves they are registered, or by what. `InternalAddGeneratedFile`, `AddDescriptors` and `descriptor_table` all matched **0** as literal strings — but a non-virtual free function's name need not appear in the binary at all, so **the string test cannot answer this** and P2-E is not resolved. | **Unowned, low priority.** | Resolved by XREF on the three blob VAs (`0x1486f5b60`, `0x1495ab7c0`, `0x1495b3330`) in the warm `nwly.gpr`. Whatever function references those pointers **is** the registration function, named or not; its size constants should read **1407 / 190 / 6028** as an independent check on the scanner's self-derived sizes (CHARTER §4 — two derivations, not one). **Low priority because it cannot change P2's verdict:** there is no Javelin descriptor to register regardless of what registers the three that exist. Worth doing only to close P2-E honestly. §17.9. |
+| **OI-P2-2** | **Are the 10 Javelin types in §17.5 the same REST calls P0 already decoded on TCP/443?** Their names are literal REST routes (`PostGameWorldsWorldIdCharactersRequest` = `POST /game/worlds/{worldId}/characters`, `DeleteGameCharactersCharacterIdRequest` = `DELETE /game/characters/{characterId}`, plus `PatchCharacterRequest`, `GetLoginInfoRequest`, `ListWorldsRequest`), and `application/json` = 236. Probably yes — **not checked.** | **Unowned.** | Cheap: diff the 10 type names against the routes in `p0_cold` (§16.2). If they match, **§17.5's "world message layer" framing needs its own §13 correction** and Track P's inbound problem was already solved by P0 in August. If they do not, the Javelin surface is a second JSON API on the world path and is worth its own chunk. §17.9. |
 | **OI-H2-5** | **`vtable+0xa8` on REP driver object — what triggers its non-zero return?** This is the gate between state 10 and 0xb (`WaitingForActorGameConnection`). S1a's primary open question: what must the server emit to advance the client past state 10. | **S1a** | The poll call is at `(**(code **)(*param_1->field4054_0x1000 + 0xa8))()` in `FUN_14644a070` case 10. §17.7. |
 
 ### Findings proven and not yet used
@@ -1668,7 +1686,7 @@ FIND-2 are the substitute for observing it.
 | -- | ------- | ----- | ----- |
 | **FIND-3** | **`Characters[].PublishedData`** — a base64, zlib-compressed (`eNr…`) blob per character in the `getlogininfo` response. Almost certainly server-published character state. | **Unowned.** | Decompresses without keys, from a response we can already read. Cheap, and it is server→client state in a readable form — the direction §15's work-order note says items 1–7 do *not* give us. Worth a small chunk. §16.3. |
 | **FIND-4** | **`Token.HostHash`** — 32 bytes, base64, in every login-queue response. **Not** a digest of any field tested: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, and SHA-256 over all ordered pairs with four separators, all returned zero (test #58). | **Unowned.** | Low priority **by itself**; it matters only if OPEN-3 resolves toward client-side validation. **Do not chase open-endedly** — the sweep already run is recorded so it is not repeated blind. §16.12. **2026-08-31 (S0a):** OPEN-3 resolved NO by trace. `HostHash` **now characterised**: its read-site is in the `Token` deserializer `FUN_1474e5990` (GetString → member +0x24, present-flag +0x2c) — **store, not compare.** It is filed like any other string and never re-read on the connect path. FIND-4's preimage question is moot for S0 (the client never checks it); it remains only a curiosity. §16.15. |
-| **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. **H2 update (§17.5):** all 10 Javelin Gateway message types go through AWS SDK model serialization. The protobuf boundary is the `FUN_146406a90`-family move constructors and the Javelin model `SerializePayload` vtable slots — P2 should target these. The `FileDescriptorProto` extraction path is still the fastest route to schemas. |
+| ~~**FIND-2**~~ **CLOSED** | ~~**`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly.~~ | ~~P2~~ **CLOSED** | **CLOSED 2026-09-04 by P2 — negative. The blobs are real and carry no game protocol.** A whole-binary scan found exactly 3 `FileDescriptorProto` blobs: `campfire_event_default.proto` (Amazon Campfire telemetry — 1 message, 1 nested context struct, 1 enum), plus the stock `google/protobuf/empty.proto` and `google/protobuf/descriptor.proto`. The latter is present because `google::protobuf::Reflection` requires it — which is the *entire* explanation for T1's flag. No Javelin descriptor, no `service` block, no message named `*Result`/`*Response`. Protobuf hands over nothing about the world messages. §17.9. |
 
 ### Unverified, carried forward
 
@@ -2487,3 +2505,196 @@ message the server must emit is whatever causes `vtable+0xa8` to return non-zero
 | Javelin dispatch factory | Allocates 0x300 bytes; installs `PTR_FUN_1485034d8` vtable; called from dispatcher that acquires SRW lock at `param_1+0x70` |
 | Connect call with credentials | Two LEA instructions loading `param_1+0x10c0` and `param_1+0x10e0` immediately before vtable `+0x18` call on REP driver |
 | Javelin model base | RTTI string `Aws::JavelinGatewayService::Model::JavelinGatewayServiceRequest` |
+
+### 17.9 FINDINGS — P2 (protobuf descriptor extraction, static) — 2026-09-04
+
+**Status:** DONE. Whole-binary scan of `NewWorld.exe` b22469132 (179,204,176
+bytes, image base `0x140000000`) from the pin at
+`~/Documents/nwly-pin/22469132/Bin64/`. No execution, no hooking, no pcap, no
+login. Instrument: `p2_scan.py`, validated before use (test #63). Open items
+OI-P2-1 and OI-P2-2 added to §15.
+
+Filed as a `###` subsection rather than a new §18: the schema content is one
+message, one nested struct and one enum, which does not make §17 unwieldy. The
+`## ` count stays 20.
+
+**Verdict: protobuf is present in the client and irrelevant to the world
+protocol.** The entire non-stock protobuf surface of a 171 MB binary is a single
+telemetry event schema. There is no Javelin descriptor, no `service` block, and
+no protobuf-encoded game message of any kind. **FIND-2 closes negative.**
+§17.5's "protobuf choke point" claim is corrected in §13.
+
+This is a negative result and it is worth more than the schema P2 went looking
+for: it removes a wrong belief from §17.5 and redirects Track P off a dead end
+before any perishable capture budget was spent on it.
+
+#### All registered `.proto` blobs — complete, 3 of 3
+
+| # | `.proto` path | package | VA | size | msgs | svcs | signature (first 16B) |
+|---|---|---|---|---|---|---|---|
+| 0 | `campfire_event_default.proto` | *(none)* | `0x1486f5b60` | 1407 | 4 | 0 | `0a1c63616d70666972655f6576656e74` |
+| 1 | `google/protobuf/empty.proto` | `google.protobuf` | `0x1495ab7c0` | 190 | 1 | 0 | `0a1b676f6f676c652f70726f746f6275` |
+| 2 | `google/protobuf/descriptor.proto` | `google.protobuf` | `0x1495b3330` | 6028 | 27 | 0 | `0a20676f6f676c652f70726f746f6275` |
+
+All three recovered at `exact` confidence — the extracted slice re-serialises
+byte-identically. **Signatures, not offsets** (CHARTER §4): the first 16 bytes
+are the encoded `name` field, i.e. the `.proto` path string constant, which
+survives a rebase where a VA does not.
+
+Blobs 1 and 2 are stock protobuf well-known types. `descriptor.proto` is present
+because `google::protobuf::Reflection` requires it — and that is the **entire**
+explanation for T1's FIND-2 flag. Blob 0 is the only non-stock content, and its
+"4 messages" are `CampfireEventDefault`, its nested `ContextData`, and two
+synthetic map-entry types. Real content: **one message, one nested struct, one
+enum.**
+
+Field names, numbers and wire types for every field are in `p2_out/fields.tsv`.
+`p2_out/blobs/*.bin` are literal byte excerpts of Amazon's binary and are **not
+committed** (CHARTER §3) — same call as the `Bin64/` pin, where only the hashes
+went into the repo. The derived `proto/`, `index.tsv`, `fields.tsv` and
+`report.md` are findings and are committed.
+
+#### `campfire_event_default.proto` — the only game-adjacent schema, and it is telemetry
+
+Campfire is Amazon's analytics/telemetry pipeline. The envelope
+(`version`/`id`/`type`/`sourceTimeMillis`/`sessionId`/`applicationVersion`/
+`metrics`/`attributes`/`eventPriority`) is a generic event-reporting shape, and
+`ContextData` fields 20–21 are **`test_new` and `test_new_2`** — leftover
+developer scaffolding, which no shipped wire protocol carries.
+
+```proto
+syntax = "proto3";
+
+message CampfireEventDefault {
+  message ContextData {
+    string world_id = 1;          string hub_id = 2;
+    string player = 3;            string guild_id = 4;
+    string character_id = 5;      string persona_id = 6;
+    string prefabName = 7;        sint32 territory_id = 8;
+    sint32 poi_id = 9;            float xpos = 10;
+    float ypos = 11;              float zpos = 12;
+    string host_world_id = 13;    sint32 level = 14;
+    optional bool IsGM = 15;      double owned_expansion = 16;
+    optional CampfireEventDefault.FactionType faction_type = 17;
+    optional bool pvp_flag_state = 18;
+    string objective_id = 19;
+    string test_new = 20;         string test_new_2 = 21;
+  }
+  enum FactionType { None = 0; Faction1 = 1; Faction2 = 2; Faction3 = 3; }
+
+  uint32 version = 1;                     string id = 2;
+  string type = 3;                        int64 sourceTimeMillis = 4;
+  optional string utcOffset = 5;          optional string userId = 6;
+  optional string sessionId = 7;          optional string applicationName = 8;
+  optional string applicationVersion = 9; optional string platformName = 10;
+  optional string platformVersion = 11;   optional string locale = 12;
+  optional string graphName = 13;
+  map<string, ?> metrics = 14;      // emitted as repeated MetricsEntry
+  map<string, ?> attributes = 15;   // emitted as repeated AttributesEntry
+  optional CampfireEventDefault.ContextData context = 16;
+  optional int32 eventPriority = 17;
+}
+```
+
+**Secondary value — identifier vocabulary, not wire format.** The schema
+independently corroborates Amazon's own identifier model: `world_id` /
+`host_world_id`, `character_id` / `persona_id`, `guild_id`, `territory_id`,
+`poi_id`, `faction_type`, `pvp_flag_state`. The `character_id` / `persona_id`
+split matches §17.3's `javelin.impersonate-character-id` /
+`impersonate-persona-id` feature flags, and `world_id` vs `host_world_id` is
+worth remembering for S0's `RepAddress` rewrite. **Naming crib only — nothing
+here is a wire format and nothing should be built on it.**
+
+#### Diagnostics — serialization shape (test #65)
+
+| string | count | reading |
+|---|---|---|
+| `application/json` | **236** | Javelin is JSON |
+| `application/x-protobuf` | **0** | no protobuf transport anywhere |
+| `application/octet-stream` | 0 | |
+| `JavelinGatewayService` | 20 | matches §17.5's RTTI enumeration |
+| `InitializeReplicatedFields` | **94** | matches T1/§10's independent ~94 — cross-check passed |
+| `ReplicaChunk` | 23 | GridMate replica marshalling present |
+| `google::protobuf::Reflection` | 1 | a single `GOOGLE_CHECK` assert string |
+| `AmazonSerializableWebServiceRequest` | 1 | |
+| `Aws::Utils::Json::JsonValue` | 1 | |
+
+**Caveat, and it binds: half this table is unreliable.** Every search string
+containing `::` was matched **literally**, but MSVC stores RTTI **mangled**
+(`JsonView` appears as `?…@JsonView@Json@Utils@Aws@@`). So `JsonView` = 0,
+`DataSetBase` = 0, `Marshaler` = 0, `MessageLite` = 0 and `DescriptorPool` = 0
+are **artefacts of the search, not evidence of absence** — §16.15 read the
+`JsonView` GetString helper directly in Ghidra, and that outranks this table.
+**Citable rows are bare identifiers and content-type literals only.** CHARTER §4
+— a tool's cap is part of the measurement.
+
+`google::protobuf::Reflection` = 1 is a `GOOGLE_CHECK` assertion string, not
+RTTI. **That single assert string was the entire evidentiary basis of FIND-2.**
+
+#### Predictions — recorded before the scan (CHARTER §4)
+
+`P2_PROMPT.md`'s three predictions: **all falsified.**
+
+| Source | Prediction | Outcome |
+|---|---|---|
+| P2_PROMPT 1 | `InternalAddGeneratedFile` has 20–100 callers; total blob count exceeds the 10 RTTI types | **FALSIFIED.** 3 blobs, 2 of them stock. |
+| P2_PROMPT 2 | Response/result types present in the blobs though absent from RTTI | **FALSIFIED.** No Javelin descriptor exists in any form. |
+| P2_PROMPT 3 | A `service JavelinGatewayService` block exists — "the single most valuable find P2 can make" | **FALSIFIED.** Zero service blocks across all 3 descriptors. |
+| P2-A | ≥1 blob recovered, FIND-2 holds | **Confirmed but hollow** — holds literally, yields nothing on the world protocol. |
+| P2-B | No Javelin service block | **CONFIRMED.** |
+| P2-C | Packages are infrastructure, not javelin/world/character | **CONFIRMED.** |
+| P2-D | JSON, not protobuf | **CONFIRMED.** 236 vs 0. |
+| P2-E | `InternalAddGeneratedFile` absent, `AddDescriptors`/`descriptor_table` present instead | **NOT RESOLVED — OI-P2-1.** All three matched 0, but a non-virtual free function's name need not appear in the binary; the string test cannot answer this. |
+
+#### OI-H2-3 — answered, and the answer is mundane
+
+**The server→client schema is absent from RTTI because AWS SDK for C++
+`XResult` classes are non-polymorphic value types — no vtable, therefore no
+RTTI.** `XRequest` derives from the polymorphic
+`AmazonSerializableWebServiceRequest` and so does emit RTTI. "10 request types,
+no result types" is the expected shape of SDK codegen, **not** evidence that
+responses are deserialized by some exotic path — which was H2's inference and is
+now withdrawn.
+
+The inbound Javelin schema is **JSON**, recoverable two ways, neither needing a
+running client and neither perishable:
+
+1. **From P0's existing captures** — the auth-phase traffic is already decrypted
+   plaintext JSON (§16.2–16.4, §16.9).
+2. **From `.rdata` string constants** — AWS SDK JSON field names are `GetString`
+   / `WithString` arguments, exactly as §16.15 recovered the `Token` fields.
+
+#### What P2 unblocks, and what it redirects
+
+**Track P retargets off protobuf entirely.** The world stream is **GridMate
+`ReplicaChunk` marshalling** (`ReplicaChunk` 23, `InitializeReplicatedFields`
+94, plus §10's `VTransformReplicaChunk` / `VTriggerAreaReplicaChunk` /
+`ScriptComponentReplicaChunk`). **We hold the source for that** — the Lumberyard
+fork at `7d4f1ee6`, which already builds (§5, §7). This is CHARTER §2's thesis
+paying off: on this layer the reference build is not merely the check, it is the
+primary source, readable with no capture and no client.
+
+**That route is immune to the 2027-01-31 sunset** (§16.0) and should be
+prioritised over anything capture-dependent.
+
+**For S1a:** there is no protobuf send-side schema to emit. The Javelin surface
+is JSON REST and is very likely the same auth-phase API P0 decoded on TCP/443 —
+the ten §17.5 type names are literal REST routes. **Not yet confirmed —
+OI-P2-2.**
+
+#### Instrument — `p2_scan.py`
+
+Scans `.rdata`/`.data` for the `FileDescriptorProto` **artefact** rather than for
+a registration **function**, because `InternalAddGeneratedFile` is the
+proto2/early-proto3 API while protobuf ≥3.10 emits
+`internal::AddDescriptors(const DescriptorTable*)` — the artefact is
+version-independent, the function is not. Recovers each blob's exact size by
+walking its top-level fields, so it never needs the caller's size constant,
+which leaves that constant free to serve as an independent check (OI-P2-1).
+
+Validation and the two defects the controls caught are test #63. **Known caps:**
+`::`-containing diagnostic strings miss mangled MSVC RTTI (above); `map<>` fields
+render with unresolved value types (`fields.tsv` carries the truth); the scanner
+finds descriptors **as data** and does not prove any is registered (OI-P2-1); a
+compressed or obfuscated descriptor would be invisible, and absence of a hit is
+not proof of absence.

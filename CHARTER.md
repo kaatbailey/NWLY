@@ -268,9 +268,99 @@ cannot be handed to anything.
 
 ---
 
+### 6.8 The rules are checked by a script, because rules alone have failed
+
+Added 2026-09-04, after P2, when **two chunk rows were found ticked `[x]` while
+their notes still routed a session to run them** and a prompt file was missing
+from the inventory for the third time.
+
+**The pattern that forced this section: every one of those failures already had a
+rule written against it.** §6.4 says a ticked row carries a pointer to the STATE
+section. §6.7 says a prompt that exists only on one machine cannot be handed to
+anything. Both were written down, both were understood, and both were violated —
+§6.7 three times. Adding an eighth rule to the seven that did not hold would be
+the same move that already failed.
+
+So this section adds a **mechanism**, not a rule. §6.2 is the precedent and the
+only part of §6 that has never been violated, because it is the only part that
+does not depend on anyone remembering it:
+
+> *A session cannot be expected to notice that its inputs are three days old; it
+> can be expected to compare two numbers.*
+
+That generalises. A session cannot be expected to remember a six-step closing
+sequence. It can be expected to run one command.
+
+**`check_docs.py` lives in the repository root and is run twice per session:
+once at the start, before its inputs are believed, and once before `git push`,
+before the work is believed finished.** It verifies, mechanically:
+
+- STATE's four freshness numbers against the file itself (§6.2)
+- no duplicate section numbers (the 2026-08-29 duplicate §11)
+- **`STATE.md` and `CHUNKS.md` name the same complete chunks** (§6.4)
+- every `[x]` row carries a verdict, a date, **and a STATE § pointer** (§6.4(1))
+- **no `[x]` row still contains live routing language** — the 2026-09-04 failure
+- every `*_PROMPT.md` on disk is inventoried, and every inventoried one exists (§6.7)
+- every complete chunk's prompt carries a DONE banner (§6.4(2))
+- no completed chunk is still named as what to do next
+- every open item in §15 has an owner cell (§6.6)
+- §1's no-AI-regeneration sentence is still present in this file
+
+**A FAIL means stop and resolve it. It does not mean proceed carefully.** Same
+standard as §6.2, for the same reason.
+
+**Three consequences worth stating explicitly.**
+
+**(a) Ticking a row and rewriting its note are one action, not two.** The
+2026-09-04 failure was not a missing tick — it was a tick *without* the rewrite,
+on two rows at once. That is strictly worse than an untouched row: the `[x]`
+suppresses the reader's suspicion while the note supplies the wrong instruction.
+§6.4 already implies this by requiring a STATE pointer; it is made explicit here
+because implication was not enough.
+
+**(b) The checker is an instrument, and §4 applies to it.** *A belief validated
+only against your own tooling is not validated.* A green `check_docs.py` means
+the invariants it encodes hold — not that the documents are true. It cannot tell
+whether a finding is correct, whether a verdict is justified, or whether a
+correction row says the right thing. **It is a floor, not a ceiling**, and a
+session that treats a green run as proof the handoff is sound has made exactly
+the error §4 warns about. When it gains a check, record what that check cannot
+see.
+
+**(c) A chunk that falsifies its own premise is COMPLETE, not partial** —
+provided its definition of done carries an "or confirmed absent" branch and the
+negative is recorded with evidence. **P2 is the worked example**: it went looking
+for protobuf schemas, found the premise false, and its value was the correction
+(STATE §13, §17.9) plus the retargeting of Track P. Residuals go to §15 with an
+owner. Marking such a chunk partial would leave the router ambiguous and invite a
+future session to re-run work whose answer is already written down.
+
+**(d) A session ends with a HANDOFF block, and nothing after it.** The owner's
+action items are not findings and must not be distributed through the session's
+prose — fixed shape, plain imperatives, ten lines maximum, last thing in the
+message, derived from `check_docs.py --close` rather than from memory. Full form
+in `CHUNKS.md`, "What the SESSION owes you at the end". This is a rule because on
+2026-09-04 a session did the work correctly and then made the owner mine several
+hundred words of reasoning to extract his own to-do list. **Findings are the
+session's product; the action list is the owner's, and the two must be separable
+in one glance.** An empty HANDOFF block is information; an absent one costs the
+owner a read.
+
+**(e) The check is enforced at the push, not only by habit.** `hooks/pre-push`
+runs `check_docs.py --close` and blocks the push on FAIL. Install once:
+`cp hooks/pre-push .git/hooks/pre-push; and chmod +x .git/hooks/pre-push`.
+`git push --no-verify` bypasses it, deliberately and rarely — the hook exists so
+that pushing an inconsistent state is a **decision** rather than an oversight.
+
+---
+
 ## 7. Amendment log
 
 | Date       | Change                                                                                                                            |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-28 | Charter created. Transport → protocol → server layering fixed. Reference build named as the primary instrument. Anti-cheat ruled out permanently. Client modification ruled out as a delivery mechanism. |
 | 2026-08-30 | **§6 added — session protocol.** Written after two days lost to document failures rather than technical ones (stale-snapshot session producing a duplicate §11; three false "your work isn't pushed" conclusions; T3 and T5 complete while `CHUNKS.md` still routed sessions to run them). Seven rules: single-writer sessions, a freshness header on `STATE.md` checked first thing, §4's validation standard extended to claims about our own repo, router-before-ledger ordering, unwritten work does not count, an open-items register covering defects/unchunked findings/undecided gates, and what a session is handed. §5 given a pointer to §6. Amendment-log date filled. **§1–§4 untouched, verified byte-identical.** Authorised by the project owner, who wrote §1's no-AI-regeneration rule and suspended it once, deliberately, for this amendment. |
+
+| Date | Change |
+| ---- | ------ |
+| 2026-09-04 | **§6.8 added — the rules are checked by a script.** Written after P2, when **two rows (H2 and P2) were found ticked `[x]` while their notes still read "NEXT — ready to run"** and carried no STATE pointer, and `P2_PROMPT.md` was missing from the standalone inventory for the third time. The diagnosis is that every one of these failures already had a rule against it, so an eighth rule would repeat the move that failed; §6.2 — the only never-violated part of §6 — works because it requires comparing numbers rather than remembering intent. `check_docs.py` added to the repository root and made mandatory at session start and before push, encoding the §6.2/§6.4/§6.6/§6.7 invariants plus duplicate-section and stale-routing detection. Five consequences recorded: ticking a row and rewriting its note are one action; the checker is an instrument and §4 applies to it (a floor, not a ceiling); a chunk that falsifies its own premise closes COMPLETE, not partial; **a session ends with a ten-line HANDOFF block and nothing after it**, because on the same day a session made the owner mine several hundred words of prose for his own action list; and the check is enforced by a `pre-push` hook so that pushing an inconsistent state is a decision rather than an oversight. **§1–§5 untouched. §6.1–§6.7 untouched.** Authorised by the project owner. |
