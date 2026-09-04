@@ -1,0 +1,16 @@
+#!/bin/sh
+# nwproto — refuse to push documents that contradict each other (CHARTER §6.4).
+# Install:  cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+# Bypass (rare, deliberate):  git push --no-verify
+
+repo=$(git rev-parse --show-toplevel)
+[ -f "$repo/check_docs.py" ] || exit 0
+
+echo "nwproto: checking document consistency before push..."
+if ! python3 "$repo/check_docs.py" "$repo" --close; then
+    echo ""
+    echo "  PUSH BLOCKED. Fix the items above, or use --no-verify if you"
+    echo "  genuinely mean to push a known-inconsistent state."
+    exit 1
+fi
+exit 0
