@@ -8,14 +8,3 @@ build/*
 assets/
 extracted/
 datasheets/
-fold_d2.py
-fold_d2_rows.py
-fix_d2_fold.py
-STATE.md.bak-20260829-111859
-STATE.md.bak2-20260829-112458
-STATE.md.bak3-20260829-112648
-CHUNKS.md.bak-20260829-111859
-CHUNKS.md.bak2-20260829-112458
-add_d2_section.py
-T5_PROMPT.md
-T5_FINDINGS.md
