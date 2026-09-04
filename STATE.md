@@ -18,9 +18,9 @@ read on, not to propose anything:
 ```fish
 cd ~/Documents/NWLY; and git pull
 grep -c '^## ' STATE.md                                                    # expect 19
-awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 59
+awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 62
 awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
-  | grep -vc '^| Old claim\|^| ---'                                        # expect 26
+  | grep -vc '^| Old claim\|^| ---'                                        # expect 28
 git log -1 --format='%h %ad %s' origin/Master
 ```
 
@@ -335,7 +335,7 @@ dynamic work runs against the client **under Proton** (confirmed below).
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Reference build only; retail ships its own static 1.1.1k. |
 | AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. **All four flags are required** — `-fdelayed-template-parsing` in particular is load-bearing and was briefly and wrongly believed redundant (§13, tests #32–#34). |
 | GridMate build recipe       | The AzCore recipe plus `-I GridMate -I GridMate/Platform/Linux` and **`-DDTLS1_RT_HEARTBEAT=24`**. See §7. |
-| Ghidra project              | Not yet created. RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
+| Ghidra project              | /home/kaatlev/Documents/Ghidra-projects/nwly.gpr.  RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
 
 **Gotchas found so far:**
 
@@ -2248,7 +2248,7 @@ need these to *emit* a Token the client accepts, and they confirm §16.10's wire
 present-flag byte. (Offsets are in the Token sub-object, distinct from the connection-object
 offsets above.)
 
- Auto-analysis + Windows PE RTTI analyzer
+ The Auto-analysis + Windows PE RTTI analyzer
 have run on the b22469132 project. Dispatch-adjacent landmarks passed: the
 GameConnection state machine (`FUN_14644a070`) and its state-name table
 (`PTR_s_Disconnected_1484f9ff0`), the REP driver vtable at obj+0x1000, and the AWS
