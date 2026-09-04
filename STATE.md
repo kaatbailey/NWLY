@@ -5,7 +5,7 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-09-04** |
-| Written against commit | **FILL ON COMMIT** (parent: a2d2fcd) |
+| Written against commit | 7882428 |
 | Section count (every `## ` header, this one included) | **20** (§16.15 is a `###` subsection, not a new `## `) |
 | Highest test number (§14) | **65** |
 | Correction row count (§13) | **29** |
