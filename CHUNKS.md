@@ -80,7 +80,17 @@ the ready-to-paste prompt for each chunk.
 > directly, so the verdict is a **traced** NO with no outstanding residual. Two corrections added to STATE §13 (the committed
 > `pins/` claim; the S0a-prompt "field names are literal JSON keys" assumption). Findings
 > folded to STATE §16.15; tests #60–#61 logged. **`S0A_PROMPT.md` still needs its DONE
-> banner** — a one-block edit noted below. No finding altered, no chunk un-ticked.
+> banner** — a one-block edit noted below. No finding altered, no> chunk un-ticked.
+
+> **Sixth amendment, 2026-08-31 — `H2_PROMPT.md` created; H2 marked NEXT.** Written at
+> creation time (before H2 runs), added to the standalone-prompt inventory the same
+> moment — the practice CHARTER §6.7 teaches. H2 is the static-Ghidra protocol-structure
+> chunk, warm from S0a's project: walk the receive path `recvfrom → SSL_read → GridMate
+> Carrier → dispatch`, identify the routing mechanism, enumerate message types, mark the
+> protobuf choke point (FIND-2). Its load-bearing prediction (transport matches reference
+> GridMate source down to the message boundary) doubles as a falsification check on
+> T5/§12B. Unblocks P2 and S1a's send-side. No finding altered, no chunk ticked or
+> un-ticked — this only adds a prompt and points the Order at it.
 
 > **Repair note — 2026-08-29.** This file was corrected alongside `STATE.md`.
 > Changes: **T5's dependency list fixed** (it needs T3's retail capture, which was
@@ -113,11 +123,12 @@ document, it should be the charter.
 
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
 its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`,
-**`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`** — the first added
-2026-08-30 after it was missing from this list while P0 ran, which is the same "a
-prompt that exists only on one machine cannot be handed to anything" failure CHARTER
-§6.7 names; the latter two added the same day **at creation time**, which is the
-practice that failure was supposed to teach).
+**`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`**, **`H2_PROMPT.md`** — the
+first added 2026-08-30 after it was missing from this list while P0 ran, which is the
+same "a prompt that exists only on one machine cannot be handed to anything" failure
+CHARTER §6.7 names; the latter three added the same day **at creation time**, which is
+the practice that failure was supposed to teach — `H2_PROMPT.md` created 2026-08-31,
+before H2 was started).
 Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
 not the summary.
@@ -154,7 +165,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 |       | Chunk                                          | Depends on | Deliverable                                                          |
 | ----- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------- |
 | `[ ]` | **H1** Frida crypto hook on the reference build | T2, T4     | `SSL_read`/`SSL_write` plaintext logged from a target we control. **Now also: prove the signature scan here** — see the prompt |
-| `[ ]` | **H2** Locate the dispatch point in retail (static) | T1, ~~(T5)~~ **T5 done** | Ghidra: the message-type switch or handler table. **Falsification check is now armed, not deferred** |
+| `[ ]` | **H2** Map the inbound world-message path and its dispatch (static) | T1, ~~(T5)~~ **T5 done** | **NEXT — ready to run 2026-08-31.** Ghidra, warm from S0a (same b22469132 project, RTTI done). Walk `recvfrom → SSL_read → GridMate Carrier → dispatch`; identify the routing mechanism (type-keyed table / switch / ReplicaManager marshaler) and enumerate message types; mark where protobuf enters (FIND-2). Scope ambitiously — a primary source of protocol structure, not just a hook point. Falsification check armed: prediction that transport matches reference GridMate source down to the message boundary; if not, T5/§12B strained. Unblocks **P2** (message census) and **S1a** (send-side). Prompt: `H2_PROMPT.md` |
 | `[~]` | **H3** Crypto/dispatch hook on retail           | H1, H2, T2 | **LAST RESORT — deliberately deprioritised 2026-08-30, not blocked.** Only if P0/S0/S1a/H2/H4 are exhausted. One attempt; EAC prevention is terminal. STATE §3, §15 |
 | `[ ]` | **H4** The reflection reader (`SerializeContext`) | T1       | **Decision gate + prototype.** Only if the ABI proves traversable    |
 
