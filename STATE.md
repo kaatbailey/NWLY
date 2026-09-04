@@ -4,12 +4,12 @@
 
 | Field | Value |
 | ----- | ----- |
-| Last updated | **2026-08-31** |
+| Last updated | **2026-09-04** |
 | Written against commit | a2d2fcd |
-| Section count (every `## ` header, this one included) | **19** (§16.15 is a `###` subsection, not a new `## `) |
+| Section count (every `## ` header, this one included) | **20** (§16.15 is a `###` subsection, not a new `## `) |
 | Highest test number (§14) | **62** |
 | Correction row count (§13) | **28** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, **S0a** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, **H2** |
 | Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
@@ -17,7 +17,7 @@ read on, not to propose anything:
 
 ```fish
 cd ~/Documents/NWLY; and git pull
-grep -c '^## ' STATE.md                                                    # expect 19
+grep -c '^## ' STATE.md                                                    # expect 20
 awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 62
 awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
   | grep -vc '^| Old claim\|^| ---'                                        # expect 28
@@ -108,8 +108,10 @@ in this order:
    What remains in this layer is H-track (H1/H2 → H3), which supplies the
    epoch-≥1 plaintext.
 2. **Protocol layer** — what the messages mean (handshake, dispatch table,
-   replica model, wire encoding of the messages a session needs). **Not started**
-   — blocked on H3, which is blocked on H1+H2.
+   replica model, wire encoding of the messages a session needs). **Partially
+   started** — H2 (§17) mapped the world-message dispatch and enumerated all 10
+   Javelin Gateway message types. Deep per-message decode (P-track) and protobuf
+   schema extraction (P2/FIND-2) are still open, blocked on H1 plaintext.
 3. **Server layer** — a server that completes a handshake, stands a character in
    the world, and serves enough state to render and move. **Not started.** Its
    content source is ready (D2, §11).
@@ -181,9 +183,11 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
   transport.** P1–P4 all confirmed. Offline: two pcaps + source, no client launch,
   no hooks, no decryption. §12B.
 
-**Open, in dependency order:** H1, H2 → H3 → P-track → S-track. D1 can start any
+**Open, in dependency order:** H1 → H3 → P-track → S-track. D1 can start any
 time. **T3 complete 2026-08-29 (§12A). T5 complete 2026-08-29 (§12B) — the
-T-track is finished and H-track is now the active front.**
+T-track is finished. H2 complete 2026-09-04 (§17) — world-message dispatch map
+done, Track P prioritisation and S1a handoff written. H-track active front is
+now H1.**
 
 **Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
@@ -335,7 +339,7 @@ dynamic work runs against the client **under Proton** (confirmed below).
 | Local OpenSSL               | **3.6.4 (25 Aug 2026)**, Garuda system package. Reference build only; retail ships its own static 1.1.1k. |
 | AzCore build recipe         | **`clang++ -std=c++17 -include utility -fdelayed-template-parsing -w -c <file>.cpp -I AzCore -I AzCore/Platform/Linux`**, run from `dev/Code/Framework`. Verified on clang 18 and clang 22. See §7 for why each flag is there. **All four flags are required** — `-fdelayed-template-parsing` in particular is load-bearing and was briefly and wrongly believed redundant (§13, tests #32–#34). |
 | GridMate build recipe       | The AzCore recipe plus `-I GridMate -I GridMate/Platform/Linux` and **`-DDTLS1_RT_HEARTBEAT=24`**. See §7. |
-| Ghidra project              | /home/kaatlev/Documents/Ghidra-projects/nwly.gpr.  RTTI survived (§10), so run the PE RTTI analyzer on first import — it recovers the `ReplicaChunk` class tree cheaply and is H2's starting point. |
+| Ghidra project              | `/home/kaatlev/Documents/Ghidra-projects/nwly.gpr` — auto-analysis and PE RTTI analyzer already run on `NewWorld.exe` b22469132 (sha256 `8654f01d324636d9f74f1c793b0cc4a417c3c5fa9847d9913c358ca29e0fdc8e`). **Do not re-import.** Landmarks confirmed present: `FUN_14644a070` (GameConnection state machine), `PTR_s_Disconnected_1484f9ff0` (state-name array base `1484f9f0`), REP driver object at conn+0x1000, `Amazon::Hub::TransportLayerGridMate` RTTI, `Amazon::ContainerClientSDK::REPConnection` RTTI (OnConnect/OnRecv), `Aws::JavelinGatewayService` model RTTI (10 types). §17. |
 
 **Gotchas found so far:**
 
@@ -1623,7 +1627,7 @@ we answer. None of it contacts a running retail client. In rough dependency orde
 
 | # | Work | Owner chunk | Why it needs no EAC contact |
 | - | ---- | ----------- | --------------------------- |
-| 1 | **Static extraction from `NewWorld.exe`** — dispatch point, handler table, type enum. Scope this **ambitiously**, not just far enough to aim a hook: with H3 off the critical path this is a primary source of protocol structure, not a targeting step. | **H2** | The binary sits on disk. Nothing is running; EAC is not loaded. |
+| 1 | **Static extraction from `NewWorld.exe`** — dispatch point, handler table, type enum. **DONE (H2, §17, 2026-09-04).** Dispatch mapped, 10 Javelin Gateway message types enumerated, stock/game boundary confirmed, S1a and Track P handoffs written. | ~~**H2**~~ **COMPLETE** | The binary sits on disk. Nothing is running; EAC is not loaded. |
 | 2 | **Protobuf descriptor extraction.** FIND-2: if the embedded `FileDescriptorProto` blobs are real, message schemas come out of the binary with no captured packet at all. Flagged by T1, never extracted. | **P2**, pulled earlier — or folded into H2 | Same: static file inspection. |
 | 3 | **Auth-phase decode.** FIND-1: the TCP/443 flow already decrypts via `SSLKEYLOGFILE`. Contains login, server list, session token, and the world-address handoff. Proven decryptable, **never read**. | **P0** (new) | The client writes the keylog itself. We read a file it produced. Nothing is injected or modified. |
 | 4 | **Redirection feasibility.** Can the client be pointed at a world server we run? The address comes from auth, so this depends on 3. Cheap to test and everything below rests on it. | **S0** (new) | A hosts/DNS change on our own machine. |
@@ -1652,6 +1656,11 @@ FIND-2 are the substitute for observing it.
 | ~~**OPEN-2**~~ **CLOSED** | ~~**`GUID2` in the selection path `{WorldId}_{GUID2}` is unidentified.** Candidates: instance, shard, channel.~~ | S0 — a redirect must produce or echo it. | **CLOSED 2026-08-30 by P0b. All three candidates were wrong.** `GUID2` is the **queue ticket id** (`Token.TicketId == GUID2`; outer `TicketId == "{WorldId}_{GUID2}"`). It is **server-minted** in the enqueue response and echoed back by the client on redemption — so a redirect does not have to *produce* it, only echo what it issued. §16.12, test #57, §13. |
 | ~~**OPEN-3**~~ **RESOLVED (NO — confirmed by trace)** | ~~**Does the client validate `Token.Signature` (RSA-2048, 256 bytes) or `Token.HostHash` (32 bytes) before dialling `Token.RepAddress`?**~~ | S0's design shape. | **RESOLVED 2026-08-31 by S0a → NO, confirmed by direct trace. §16.15.** No asymmetric-verify API imported; five consume-side functions crypto-free; **and the deserializer itself was read** (`FUN_1474e4f20` → `FUN_1474e5990`): `Signature`/`HostHash`/`RepAddress` are pulled by the stock AWS-SDK `JsonView` GetString helper, stored, and never inspected. Client treats `RepAddress` as opaque cargo → **S0 is the small field-rewrite branch.** Upgraded from the provisional NO recorded earlier the same day; **OPEN-3R closed.** |
 | ~~**OPEN-3R**~~ **CLOSED** | ~~Residual of OPEN-3: is there a verify at *deserialize* time?~~ | ~~S0~~ | **CLOSED 2026-08-31, same session. Route (a) taken.** The deserializer was located by xref of the response-unique keys `AllowQueueTransfer`/`JwtClaims` (the field names are `GetString` args, not typed-model members — hence unreachable by the earlier scalar/string search) and read directly: `FUN_1474e4f20` (top-level) → `FUN_1474e5990` (`Token`). `Signature` and `HostHash` are stored via the same GetString helper as every other field and **never read again** — no verify at deserialize time. The static-OpenSSL scenario is excluded by reading, not by import absence. `login-token-signature-check` did not need its xref: it names the auth JWT, and the queue `Token` deserializer provably contains no verify. **No empirical (perishable) test was needed.** §16.15. |
+| **OI-H2-1** | **LibUV role — confirm whether `Amazon::Hub::TransportConnectionLibUV` wraps the DTLS/world path or only a parallel HTTP/service channel.** `StartRecv`/`StopRecv` confirmed in imports; T5/§12B's "structurally stock" conclusion holds for the Carrier/crypto layer but the socket driver is LibUV-wrapped, which was not predicted. | **H1** sub-task | If LibUV wraps the DTLS path, T5/§12B needs a precision note ("zero catalogued exceptions in the Carrier layer" rather than "in the transport"). §17.1. |
+| **OI-H2-2** | **`REPConnection::OnRecv` body not resolved statically.** Ghidra treats the entry as an `UndefinedFunction` thunk at `146b717b0`; the actual callable body was not isolated. | **H1** | H1 runtime hook on the vtable slot at `148591750` will confirm the body and its ReadBuffer dispatch logic. §17.2. |
+| **OI-H2-3** | **Server→client response schema absent from RTTI.** No `Result`/`Response` types in the Javelin Gateway RTTI — 10 request types only. Server→client messages are deserialized differently, not instantiated as typed RTTI objects. | **P2** | P2 must locate the inbound schema via the AWS SDK `GetBody`/`SerializePayload` path or via H1 runtime capture. §17.5. |
+| **OI-H2-4** | **Second state-machine function for states 5–8** (`QueryForRemoteConfigClass` through `WaitingForREPRequirements`) not yet located. `FUN_14644a070` only handles states 1–4 and 7–0xe. | **Unowned** | Low priority — these states are pre-connect and do not affect S1a or Track P. §17.6. |
+| **OI-H2-5** | **`vtable+0xa8` on REP driver object — what triggers its non-zero return?** This is the gate between state 10 and 0xb (`WaitingForActorGameConnection`). S1a's primary open question: what must the server emit to advance the client past state 10. | **S1a** | The poll call is at `(**(code **)(*param_1->field4054_0x1000 + 0xa8))()` in `FUN_14644a070` case 10. §17.7. |
 
 ### Findings proven and not yet used
 
@@ -1659,7 +1668,7 @@ FIND-2 are the substitute for observing it.
 | -- | ------- | ----- | ----- |
 | **FIND-3** | **`Characters[].PublishedData`** — a base64, zlib-compressed (`eNr…`) blob per character in the `getlogininfo` response. Almost certainly server-published character state. | **Unowned.** | Decompresses without keys, from a response we can already read. Cheap, and it is server→client state in a readable form — the direction §15's work-order note says items 1–7 do *not* give us. Worth a small chunk. §16.3. |
 | **FIND-4** | **`Token.HostHash`** — 32 bytes, base64, in every login-queue response. **Not** a digest of any field tested: SHA-256/SHA-1/MD5/SHA-512 over every scalar `Token` field plus bare IP and bare port, and SHA-256 over all ordered pairs with four separators, all returned zero (test #58). | **Unowned.** | Low priority **by itself**; it matters only if OPEN-3 resolves toward client-side validation. **Do not chase open-endedly** — the sweep already run is recorded so it is not repeated blind. §16.12. **2026-08-31 (S0a):** OPEN-3 resolved NO by trace. `HostHash` **now characterised**: its read-site is in the `Token` deserializer `FUN_1474e5990` (GetString → member +0x24, present-flag +0x2c) — **store, not compare.** It is filed like any other string and never re-read on the connect path. FIND-4's preimage question is moot for S0 (the client never checks it); it remains only a curiosity. §16.15. |
-| **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. |
+| **FIND-2** | **`google::protobuf` is present in `NewWorld.exe`** (T1, §10). Embedded `FileDescriptorProto` blobs may hand over message schemas directly. | **P2**, flagged not extracted. | Recorded here because P2 is blocked behind GATE-1, and if GATE-1 resolves badly this becomes one of the few remaining routes into message structure. **H2 update (§17.5):** all 10 Javelin Gateway message types go through AWS SDK model serialization. The protobuf boundary is the `FUN_146406a90`-family move constructors and the Javelin model `SerializePayload` vtable slots — P2 should target these. The `FileDescriptorProto` extraction path is still the fastest route to schemas. |
 
 ### Unverified, carried forward
 
@@ -2248,8 +2257,233 @@ need these to *emit* a Token the client accepts, and they confirm §16.10's wire
 present-flag byte. (Offsets are in the Token sub-object, distinct from the connection-object
 offsets above.)
 
- The Auto-analysis + Windows PE RTTI analyzer
-have run on the b22469132 project. Dispatch-adjacent landmarks passed: the
-GameConnection state machine (`FUN_14644a070`) and its state-name table
-(`PTR_s_Disconnected_1484f9ff0`), the REP driver vtable at obj+0x1000, and the AWS
-Javelin gateway RTTI. `google::protobuf` presence (FIND-2, §10) unre-examined here.
+
+---
+
+## 17. World-message dispatch map (H2)
+
+**Status:** DONE 2026-09-04. Static analysis of `NewWorld.exe` b22469132 from
+Ghidra project `~/Documents/Ghidra-projects/nwly.gpr`. No execution, no hooking,
+no pcap. Open items OI-H2-1 through OI-H2-5 added to §15.
+
+---
+
+### 17.1 Inbound path — stock/game boundary
+
+The inbound datagram path:
+
+```
+WSARecvFrom (WS2_32.DLL import)
+  → Amazon::Hub::TransportLayerLibUV (LibUV async I/O event loop)
+    → Amazon::Hub::TransportLayerGridMate::Connect / Listen
+      → Amazon::ContainerClientSDK::REPConnection::OnConnect
+      → Amazon::ContainerClientSDK::REPConnection::OnRecv(Amazon::Pervasives::ReadBuffer)
+        → Aws::JavelinGatewayService handler objects (message layer)
+```
+
+**Stock/game boundary:** Everything from `WSARecvFrom` through
+`TransportLayerGridMate` is stock transport (GridMate + LibUV). The game-specific
+message layer begins at `REPConnection::OnConnect` / `OnRecv`.
+
+**LibUV finding (prediction-1 partial strain):** The raw socket is driven by
+LibUV's event loop (`Amazon::Hub::TransportConnectionLibUV::StartRecv` /
+`StopRecv` confirmed in imports), not a raw GridMate `SocketDriver` poll loop.
+T5/§12B's "structurally stock GridMate" conclusion holds for the Carrier/crypto
+layer, but the socket driver is LibUV-wrapped. Record as a precision gap in
+T5/§12B's "zero catalogued exceptions" wording — not a falsification of the
+transport conclusion. OI-H2-1: confirm whether LibUV wraps the DTLS path or only
+a parallel HTTP/service channel.
+
+---
+
+### 17.2 REPConnection — Anchor C
+
+**Class:** `Amazon::ContainerClientSDK::REPConnection`
+
+**Constructor:**
+```
+REPConnection(Amazon::Hub::Log&, Amazon::Pervasives::Endpoint const&,
+              std::function, std::function, std::function)
+```
+Three `std::function` callbacks registered at construction: onConnect,
+onDisconnect, onMessage (order inferred from usage).
+
+**Key methods (confirmed in RTTI):**
+- `OnConnect(Amazon::Hub::TransportConnection*)` — private, fires on DTLS
+  handshake completion. Handler at `146474e80` logs:
+  `"GameConnectionWrapper: REP socket connection established, now waiting to
+  i[nitialize]"`. This is the transition into GameConnection state 10
+  (`WaitingForREPConnection`).
+- `OnRecv(Amazon::Pervasives::ReadBuffer)` — private, fires on inbound
+  decrypted data. RTTI type descriptor at `14a268a90`. Thunk at `146b717b0`;
+  actual callable body not resolved statically (OI-H2-2).
+
+**REPConnection vtable layout (partial, from `148591718`–`148591760`):**
+
+| Address | Target | Notes |
+|---|---|---|
+| `148591718` | `LAB_146b717c0` | thunk |
+| `148591720` | `LAB_146b717c0` | thunk |
+| `148591728` | `FUN_14078fa10` | |
+| `148591730` | `FUN_14046dc90` | |
+| `148591738` | `LAB_146b71300` | copy constructor helper |
+| `148591740` | `LAB_146b71300` | |
+| `148591748` | `LAB_146b714b0` | |
+| `148591750` | `LAB_146b717b0` | **OnRecv thunk** (RTTI confirmed) |
+| `148591758` | `FUN_14078fa10` | |
+| `148591760` | `FUN_14046dc90` | |
+
+**Three event handler tables** passed to REP driver connect call
+(`FUN_146425f20`, vtable slot `+8` on `param_1+0x1000`):
+- `PTR_LAB_148502988` — connection lifecycle (OnConnect at `146474e80`)
+- `PTR_LAB_1485029b8` — second handler table
+- `PTR_LAB_1485029e8` — third handler table (factory thunk at `1464733d0`)
+
+---
+
+### 17.3 Connect call and credential fields
+
+In `FUN_146425f20` (called from GameConnection state machine case 9,
+`StartREPConnection`):
+
+```c
+// vtable +8: install handler tables
+(**(code **)(**(longlong **)(param_1 + 0x1000) + 8))
+    (*(longlong **)(param_1 + 0x1000), local_188, &local_2f8, &local_338);
+
+// vtable +0x18: the actual connect call with credentials
+(**(code **)(**(longlong **)(param_1 + 0x1000) + 0x18))
+    (*(longlong **)(param_1 + 0x1000), &local_238, &local_218,
+     param_1 + 0x10c0, param_1 + 0x10e0, &local_2b8, bVar10);
+```
+
+**`param_1 + 0x10c0` and `param_1 + 0x10e0`** are the credential fields
+(Token/JWT) passed to the world connect — confirmed consistent with §16.15's
+connection-object layout. Also confirmed: the `javelin.impersonate-character-id`
+and `javelin.impersonate-persona-id` feature flags are checked here (dev tooling,
+irrelevant to production).
+
+---
+
+### 17.4 Dispatch mechanism — Javelin Gateway Service handler registry
+
+**Prediction 2: CONFIRMED.** Dispatch is registration-based, not a hand-written
+switch.
+
+The world message layer uses `Aws::JavelinGatewayService` — Amazon's own gateway
+SDK, statically linked. Each message type is a typed model object with its own
+vftable, constructed by a factory function in the `FUN_146473xxx` family. The
+handler object vtable is `PTR_FUN_1485034d8`. Factory constructor `FUN_1464733f0`
+allocates 0x300 bytes and installs this vtable.
+
+The dispatcher (`FUN_14642b130`) constructs handler objects, acquires an SRW lock
+on the connection object (`param_1 + 0x70`/`0x74`/`0x78`), looks up a handler by
+message key (`FUN_1416a6030` at offset `+0x68`), and dispatches via vtable slot
+`+8` on the registry object (`*(longlong**)(param_1 + 0x28)`).
+
+---
+
+### 17.5 Message type enumeration — complete (client→server, 10 types)
+
+All 10 types confirmed by RTTI. Symbol Table filter `JavelinGateway` (Name Only
+unchecked) matched 99 of 422809 symbols. Source: Imported (statically linked AWS
+SDK).
+
+| Message Type | vftable Address |
+|---|---|
+| `JavelinGatewayServiceRequest` (base) | `148703a38` |
+| `DeleteGameCharactersCharacterIdRequest` | `148703e8` |
+| `GetLoginInfoRequest` | `148703d0` |
+| `LinkIdentityRequest` | `148703b8` |
+| `ListWorldsRequest` | `148703c0` |
+| `PatchCharacterRequest` | `148703a8` |
+| `PostGameLoginQueueV2Request` | `148703570` |
+| `PostGameLoginQueueV2TicketIdRequest` | `148703658` |
+| `PostGameWorldsWorldIdCharactersRequest` | `148703748` |
+| `UnlinkIdentityRequest` | `148703828` |
+| `ValidateCharacterRequest` | `148703918` |
+
+**No Response/Result types in RTTI.** Server→client responses are not
+instantiated as typed RTTI objects — they are deserialized differently (OI-H2-3).
+This is the primary gap for Track P: the inbound (server→client) message schema
+is not enumerable statically from RTTI alone.
+
+**Protobuf choke point (FIND-2 / P2):** All 10 types go through AWS SDK model
+serialization. The move-constructor family (`FUN_146406a90` and siblings) embed
+named Javelin model vftables directly. P2 should target the AWS SDK
+`SerializePayload` / `GetBody` path on these model types to locate the protobuf
+schema boundary. Named model confirmed in `FUN_146406a90`:
+`Aws::JavelinGatewayService::Model::PostGameWorldsWorldIdCharactersRequest`.
+
+---
+
+### 17.6 GameConnection state table — complete
+
+State-name array at `PTR_s_Disconnected_1484f9ff0`, base address `1484f9f0`,
+indexed by state integer. Full table (H2 extended S0a's partial list):
+
+| Index | Address | State Name |
+|---|---|---|
+| 0 | `1484f9f0` | `Disconnected` |
+| 1 | `1484f9f8` | `QueryGameUpdateCheck` |
+| 2 | `1484fa000` | `WaitingForGameUpdateCheck` |
+| 3 | `1484fa008` | `QueueGameLogin` |
+| 4 | `1484fa010` | `WaitingForQueuedLogin` |
+| 5 | `1484fa018` | `QueryForRemoteConfigClass` |
+| 6 | `1484fa020` | `WaitingForRemoteConfigClass` |
+| 7 | `1484fa028` | `ObtainREPRequirements` |
+| 8 | `1484fa030` | `WaitingForREPRequirements` |
+| 9 | `1484fa038` | `StartREPConnection` |
+| 10 | `1484fa040` | `WaitingForREPConnection` |
+| 11 | `1484fa048` | `WaitingForActorGameConnection` |
+| 12 | `1484fa050` | `WaitingForSpawnPoint` |
+| 13 | `1484fa058` | `WaitingForPlayerSpawn` |
+| 14 | `1484fa060` | `InGame` |
+
+State machine function: `FUN_14644a070`. State transition helper: `FUN_14645fd70`.
+`InGame` XREF[1]: `FUN_146446800` (only one reader — likely the session health
+monitor or a status reporter).
+
+States 5–8 (`QueryForRemoteConfigClass` through `WaitingForREPRequirements`) are
+**not handled in `FUN_14644a070`** — a second state-machine function handles them.
+Not yet located (OI-H2-4).
+
+---
+
+### 17.7 Handoff notes
+
+**For S1a (first-message expectation):**
+The client advances to state 10 (`WaitingForREPConnection`) after `FUN_146425f20`
+fires the connect call with credentials at `param_1+0x10c0` / `param_1+0x10e0`.
+It then polls `vtable+0xa8` on the REP driver object (`param_1+0x1000`) each tick.
+When that poll returns non-zero, it calls `FUN_145a905d0` to set up the actor game
+connection and advances to state 0xb (`WaitingForActorGameConnection`). S1a must
+therefore complete the DTLS handshake **and** trigger `OnConnect` (which fires
+`146474e80`) before the client will advance past state 10. The first epoch-1
+message the server must emit is whatever causes `vtable+0xa8` to return non-zero
+— that is S1a's primary open question (OI-H2-5).
+
+**For Track P (prioritised message list):**
+- All 10 Javelin Gateway request types are client→server. Decode priority:
+  `PostGameWorldsWorldIdCharactersRequest` (character placement),
+  `PostGameLoginQueueV2Request` (session establishment),
+  `GetLoginInfoRequest` (auth info fetch) — these three are on the session
+  critical path.
+- Server→client response schema is not in RTTI (OI-H2-3); P2 must locate it
+  via the AWS SDK `GetBody` / `SerializePayload` path or via H1 runtime capture.
+- Protobuf boundary: target `FUN_146406a90` family and the Javelin model
+  `SerializePayload` vtable slots.
+
+---
+
+### 17.8 Signatures (scannable, patch-stable)
+
+| Landmark | Signature |
+|---|---|
+| GameConnection state machine | RTTI string `"GameConnection"` + switch on `param_1[1].field_0x528`; first log call is `"QueryGameUpdateCheck: no game update check needed."` |
+| State-name array base | Data pointed to by the array used in all `"Update state %s to new state %s"` log calls in the state machine |
+| REPConnection::OnConnect | Log string `"GameConnectionWrapper: REP socket connection established"` |
+| REPConnection constructor | Takes `Log&`, `Endpoint const&`, three `std::function` args; installs vtable containing OnRecv thunk at slot `148591750` |
+| Javelin dispatch factory | Allocates 0x300 bytes; installs `PTR_FUN_1485034d8` vtable; called from dispatcher that acquires SRW lock at `param_1+0x70` |
+| Connect call with credentials | Two LEA instructions loading `param_1+0x10c0` and `param_1+0x10e0` immediately before vtable `+0x18` call on REP driver |
+| Javelin model base | RTTI string `Aws::JavelinGatewayService::Model::JavelinGatewayServiceRequest` |
