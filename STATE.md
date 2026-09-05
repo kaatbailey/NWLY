@@ -4,12 +4,13 @@
 
 | Field | Value |
 | ----- | ----- |
-| Last updated | **2026-09-04** |
-| Written against commit | f8a536b |
-| Section count (every `## ` header, this one included) | **21** (§16.15 and §17.9 are `###` subsections; **§18 is a new `## ` added by P5**) |
-| Highest test number (§14) | **68** |
-| Correction row count (§13) | **31** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, P2, **P5** |
+| Last updated | **2026-09-05** |
+| Written against commit | **FILL ON COMMIT** (parent: f8a536b) |
+| Section count (every `## ` header, this one included) | **22** (§16.15 and §17.9 are `###` subsections; **§19 is a new `## ` added by P6**) |
+| Highest test number (§14) | **78** |
+| Correction row count (§13) | **36** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, P2, P5, **P6** |
+| P6 scope note | **P6 is ticked with steps 1–3 and 5 done and STEP 4 NOT STARTED** — the fragment message is unframed. Carried to **P7** as OI-P6-3. Precedent: P0 was ticked on a PARTIAL verdict. §19, §15. |
 | Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
@@ -17,10 +18,10 @@ read on, not to propose anything:
 
 ```fish
 cd ~/Documents/NWLY; and git pull
-grep -c '^## ' STATE.md                                                    # expect 20
-awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 62
+grep -c '^## ' STATE.md                                                    # expect 22
+awk '/^## 14\./,/^## 15\./' STATE.md | grep -oP '^\| \K[0-9]+' | tail -1   # expect 78
 awk '/^## 13\./,/^## 14\./' STATE.md | grep '^| ' \
-  | grep -vc '^| Old claim\|^| ---'                                        # expect 28
+  | grep -vc '^| Old claim\|^| ---'                                        # expect 36
 git log -1 --format='%h %ad %s' origin/Master
 ```
 
@@ -1554,6 +1555,11 @@ claim adds a row here rather than deleting the claim.
 | "**Protobuf choke point (FIND-2 / P2):** All 10 types go through AWS SDK model serialization. The move-constructor family (`FUN_146406a90` and siblings) embed named Javelin model vftables directly. P2 should target the AWS SDK `SerializePayload` / `GetBody` path on these model types to locate the protobuf schema boundary." — §17.5 (H2, 2026-09-04). | **FALSE — there is no protobuf schema boundary on that path, and no protobuf anywhere near the Javelin models.** P2 scanned the entire binary the same day and recovered **3** `FileDescriptorProto` blobs: `campfire_event_default.proto` (Campfire telemetry), `google/protobuf/empty.proto`, `google/protobuf/descriptor.proto`. No Javelin descriptor, no `service` block, **`application/x-protobuf` = 0** against **`application/json` = 236**. The AWS SDK path is **JSON**, which §16.15 had already demonstrated from the other direction by reading queue-`Token` fields out of the stock `JsonView` GetString helper — the evidence was in this file before H2 wrote the claim. Protobuf in `NewWorld.exe` serves Campfire telemetry and nothing else. **Lesson: "X and Y are both present in the binary" is not evidence that X serialises Y.** §17.9. |
 | "`InitializeReplicatedFields` **94** — matches T1/§10's independently-derived ~94, an instrument cross-check that passed" and, in the Track P retarget, "The world stream is **GridMate `ReplicaChunk` marshalling** (`ReplicaChunk` 23, `InitializeReplicatedFields` 94, plus §10's `VTransformReplicaChunk` …)" — §17.9 (P2, 2026-09-04). | **WRONG — `InitializeReplicatedFields` is not a GridMate symbol.** It is a virtual on `Javelin::*ComponentServerFacet` classes, i.e. **`Amazon::Hub`**, and is absent from the whole of `dev/Code/Framework` (AzCore + AzFramework + GridMate) at the pinned commit `7d4f1ee6`. The count matching T1's ~94 was a genuine cross-check of the **number**; the **attribution** was inherited from §10 and never verified. Those 94 references are evidence for **Hub**, not for GridMate replicas. The retarget conclusion was therefore right by accident and for the wrong reason: Track P did need to leave protobuf, but its destination is Hub (§18), not GridMate replica marshalling. **Lesson: an instrument cross-check that confirms a number does not confirm what the number is about.** §18.0, §18.1. |
 | "Note P3 depends on this: GridMate's transform marshalers **quantize**, so a raw float triple is the wrong thing to look for." — `CHUNKS.md`, P5 stub (2026-09-04). | **FALSE for the defaults.** `Marshaler<AZ::Vector3>` writes three **raw IEEE floats** (12 bytes) and `Marshaler<AZ::Transform>` four of those (**48 bytes, uncompressed**) — `Serialize/MathMarshal.h:59,186` at `7d4f1ee6`. Quantizing marshalers exist (`Float16Marshaler`, `Vec3CompRangeMarshaler`, `TransformCompressor`, `IntegerQuantizationMarshaler`) but are **opt-in per DataSet declaration**, not the default. **P3 should search for a smoothly varying raw float triple after all.** Whether New World opts in per-DataSet is unresolved — OI-P5-3. §18.4. |
+| "`CreateName` is MD5 over the name" — `P6_PROMPT.md` Step 1.2 (2026-09-04). | **FALSE — it is SHA-1.** `Uuid.cpp:285` forwards `CreateName` to `CreateData` (`:293–322`), which builds a `Sha1`, calls `ProcessBytes`/`GetDigest` into five `u32`s and writes them big-endian; `AzCore/Math/Sha1.h` included at `:15`, no MD5 include anywhere. The version nibble written is 5 (`data[6] &= 0x5F; |= 0x50`, `:315–317`, comment `VER_NAME_SHA1`). `VER_NAME_MD5 = 3` (`Uuid.h:40`) is a decode-only case in the version getter (`:386`) and is never written. **A session trusting the prompt would have implemented MD5, failed to reproduce the cached bytes, and had a live path to a false negative on OI-P5-1 that looks like a clean result.** §19.2. |
+| "Scan for the brace-delimited pattern `{XXXXXXXX-XXXX-...}`" — `P6_PROMPT.md` Steps 1.1 and 2b (2026-09-04). | **FALSE as a universal.** Both forms are present and both are parsed by `CreateStringSkipWarnings` (length window `[32,38]`, explicit brace handling). `ReplicateClient` and `REPClient` are unbraced; `PingMsg` and 5,930 others are braced. Brace style is a per-translation-unit authoring habit and discriminates nothing. A brace-anchored `.rdata` scan recovers a fraction of the set. §19.2. |
+| "`FUN_1407fbe00` … caches 16 bytes computed by `FUN_1413e84b0`" — §18.3 (P5, 2026-09-04). | **True at runtime, misleading statically.** The slot is a lazily-initialised MSVC function-local static and `_DAT_14a2e7750` reads as **all zeros in the on-disk image**. A static reader who goes to the address concludes the claim is false. This also rules out harvesting the vocabulary from `.data`: on disk the identities exist only as `.rdata` string literals. §19.1, §19.7. |
+| "The vftable layout is uniform across Hub types (8 slots, name / identity compare / visitor dispatch in slots 0–2)" — §18.3 and `P6_PROMPT.md` prediction 3 (2026-09-04). | **FALSIFIED — OI-P5-4 answered.** `FragmentUpdateMsg`'s handler table at `147f44828` has **4** entries against `ReplicateClient`'s **8** at `147f42110`. §18.3 is restated as a **single-instance observation**. Honest caveat: these may be different *kinds* of object (a message handler vs a type), so the claim is that layout is not uniform across Hub types, not that §18.3 was wrong about `ReplicateClient`. §19.7. |
+| "The Hub type vocabulary is recoverable by walking `CreateString` call sites" — `P6_PROMPT.md` Step 2b premise (2026-09-04). | **PARTLY FALSE, and the correction is the chunk's main finding.** That walk recovers 5,907 accessors at 99.4% resolution — but it is the **engine's `AZ_TYPE_INFO` vocabulary**, and **none of the ten session-layer message types are in it**. Hub message types register through `FUN_1407de270` with the UUID parse **inlined**, so there is no call site to find. **Lesson: a mechanism present in the binary and used by most types is not therefore the mechanism the layer you care about uses.** §19.3, §19.4. |
 ---
 
 ## 14. Test / capture log
@@ -1631,6 +1637,16 @@ result — so no test is silently retried and no result is remembered wrong.
 | 66 | **P5** whole-symbol-table sweep of `NewWorld.exe` b22469132 for `InstallRegistrationHook`, `REPClient`, `ReplicateClient` and `Amazon::Hub`, via `hub_probe.py` under PyGhidra. | P5 planned to decompile a registration hook and read how Hub types identify themselves. The plan assumed the hooks exist as functions. | **They do not exist as functions at all, and the sweep is what revealed the Hub layer.** `Amazon::Hub`: **3,629 symbols, 100% `Label`**. `InstallRegistrationHook`: **3,482 symbols, 100% `Label`**. **Functions with `Hub::` in the name: 0.** Every hook is inlined into a static initializer; only the type-erased lambda's RTTI descriptor survives (`…InstallRegistrationHook<T>(void)'::__l2::<lambda_1>::RTTI_Type_Descriptor`). Descriptors are **contiguous in link order** from `14a1340c0`; name strings are **scattered per translation unit** (`s_ReplicateClient` `147f42158`, `s_REPClient` `147f47b10`, `s_Amazon::Hub::ActorRef` `14803e230`). §18.1. |
 | 67 | **P5** XREF trace from the `"ReplicateClient"` name string (`147f42158`) and the `FragmentUpdateMsg` RTTI descriptor (`14a134340`) through to executable code. | If Hub is fully inlined, XREFs on data are the only route in; expect them to converge on a shared registration routine. | **They reach the type's vftable, not a registry.** vftable `0x147f42110`, **8 slots**, ending `147f42148`; targets reached via MSVC **adjustor thunks** (`MOVSXD RAX,[RCX-4]; SUB RCX,RAX; JMP`), i.e. multiple inheritance. Slot 0 (`147f42120`) → `1407f9b60` = `return "ReplicateClient";`. Slot 1 (`147f42128`) → `FUN_1407f9f30` = **16-byte identity compare**. Slot 2 (`147f42130`) → `FUN_1407f98d0` = visitor dispatch. Both call **`FUN_1407fbe00`**, a TLS-guarded magic static caching **16 bytes** at `_DAT_14a2e7750`. Also recovered **`FUN_1407f3720`**, an **inlined hook body**, building `"ReplicateClient"` as a 15-char inline `AZStd::string`. §18.3. |
 | 68 | **P5** identify the source of the 16-byte Hub type identity: decompile `FUN_1407fbe00` and locate its hash input. | Decides whether the ~3,600-type wire vocabulary is computable offline or must be extracted literal by literal. | **UNRESOLVED — OI-P5-1, and the withdrawal is the finding.** `FUN_1407fbe00` calls `FUN_1413e84b0(buf, &DAT_147f42168, 0)`, and `147f42168` is `147f42158 + 0x10` — **past `"ReplicateClient\0"`**. The input is therefore the string **following** the type name, not the name. If `FUN_1413e84b0` is `AZ::Uuid::CreateName`, the vocabulary computes offline from names already held; if `AZ::Uuid::CreateString`, ~3,600 literal UUIDs must be extracted. **The 3-argument call with a `0` length fits `CreateString`.** The session recorded the optimistic `CreateName` reading as fact mid-analysis and **withdrew it before writing** — logged because the withdrawal, not the guess, is the result. §18.3. |
+| 69 | **P6** read `DAT_147f42168` in the Listing and decompile `FUN_1413e84b0`. | OI-P5-1: decides whether the vocabulary is computed offline or extracted literal by literal. | **`CreateStringSkipWarnings`. OI-P5-1 ANSWERED; extraction, not computation.** `147f42168` holds `6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d` (36 chars, unbraced). Decompilation matches `Uuid.cpp:61–133` at `7d4f1ee6` point for point — `[32,38]` length window, brace/dash handling, `GetValue` folded to `pcVar3[-0x73a8]`, `<<4 |`, 16 iterations. Arg count corroborates: `CreateString` is 3 with sret, `CreateName` is 2. P5 prediction 1 confirmed. §19.1. | |
+| 70 | **P6** goto `_DAT_14a2e7750` to read the cached 16 bytes for `ReplicateClient`. | Proposed as an end-to-end check of literal → parser → cache. | **Zeros — and the test was invalid by construction.** The slot is a lazily-initialised function-local static; it is populated at runtime and P6 is static-only. The correct static check is the xref pairing inside `FUN_1407fbe00`: literal read at `1407fbe4b`, cache written at `1407fbe5f`. §13 row added against §18.3's wording. §19.1. | |
+| 71 | **P6** enumerate `FUN_1413e84b0`'s callers via the Ghidra flat API. | Sizes the vocabulary: caller count is an upper bound on the type count. | **4,092 returned against 15,919 in the XRefs window — the flat API `getReferencesTo()` caps at 4,096 and truncates silently.** The run sampled only the low `.text` block and its 287 literals were unrepresentative. `ReferenceManager.getReferencesTo()` returns 15,914 call/jump refs. Recorded as a tooling trap. §19.3. | |
+| 72 | **P6** resolve the `rdx` operand at all 15,914 call sites and pair each literal with a preceding name string. | Produce the name↔UUID map the chunk was chartered to deliver. | **5,907 accessors, 99.4% site resolution, gap 0–7 to the adjacent name.** Verified against three witnesses including `REPClient` at `147f47b10`, the address §18.3 recorded independently. **But none of the ten session-layer message types are in it** — this is the engine's `AZ_TYPE_INFO` vocabulary, not Hub's. §19.3. | |
+| 73 | **P6** decompile `FUN_1407eeca0`, the function referencing both the `FragmentUpdateMsg` name and its UUID literal. | Explain why the session-layer types are absent from a map with 99.4% resolution. | **Second mechanism found.** The `InstallRegistrationHook<T>` body builds the name as an `AZStd::string`, **parses the UUID inline** (`CreateString` unrolled — no call to find), calls `FUN_1407de270(&out, uuid, &name)`, and installs a handler vftable at `out+0x48`. §19.4. | |
+| 74 | **P6** enumerate `FUN_1407de270`'s references. | Test whether it is the Hub registrar and size the true vocabulary. | **3,512 refs / 3,511 call sites, against 3,482 `InstallRegistrationHook` instantiations** — two independently derived counts 30 apart. Walking them yields **3,509 distinct UUIDs from 3,510 rows**, one identity per registered Hub type. §19.4, §19.5. | |
+| 75 | **P6** recover type names from the registrar call sites (four passes: `.rdata` adjacency, RTTI descriptors, immediate reconstruction, length-checked immediates). | Complete the name half of the vocabulary. | **311 named / 3,199 anonymous, and the anonymity is by design — 8.9% is the answer, not a shortfall.** `FUN_1408947a0` constructs an **explicitly empty** string (`local_18 = 0`, `local_28 = 0`) and passes it to the registrar, structurally identical to `FUN_1407f0fb0` (`PingTrait`, `local_18 = 9`) in every other respect. The names do not exist in the binary. Four unrelated extraction strategies converging on the same figure was the data constraining the result. §19.5. | |
+| 76 | **P6** bucket named vs anonymous hooks by address region. | Test whether the named subset is scattered (tooling artifact) or structural. | **Structural.** Named hooks occur only in `1407xxxxx` (92) and `146axxxxx` (219); every other region is entirely anonymous. Those two regions are exactly the ones holding `ReplicateClient`, `REPClient`, the registration messages and `FragmentUpdateMsg`. **Hub attaches runtime names only to the wire-facing session and message layer.** The anonymous set also uses uppercase UUID literals against the named set's lowercase. §19.5. | |
+| 77 | **P6** compare `FragmentUpdateMsg`'s handler vftable at `147f44828` against `ReplicateClient`'s 8 slots at `147f42110`. | OI-P5-4: is §18.3's layout uniform or single-instance? | **4 entries vs 8 — NOT uniform. OI-P5-4 ANSWERED, §18.3 restated as single-instance.** Prediction 3 falsified. Caveat: these may be different kinds of object, so the claim is non-uniformity across Hub types, not that §18.3 was wrong about `ReplicateClient`. §19.7. | |
+| 78 | **P6** follow `InstallRegistrationHook<T>` RTTI descriptors to their hooks (`14a134340`, `14a134b30`). | A pooling-immune route to qualified type names. | **Dead, on two samples.** The descriptors describe the `<lambda_1>` inside the hook — `std::function` type-erasure — and each has one code xref landing nowhere near its hook (`1407c9370`, `1407c3a70`); neither is in the registrar map. Also dead: hook → vftable → COL, since every xref to `FUN_1407fbe00` is a `CALL` and the accessors are not virtual. §19.8. | |
 
 ---
 
@@ -1697,10 +1713,15 @@ FIND-2 are the substitute for observing it.
 | **OI-H2-2** | **`REPConnection::OnRecv` body not resolved statically.** Ghidra treats the entry as an `UndefinedFunction` thunk at `146b717b0`; the actual callable body was not isolated. | **H1** | H1 runtime hook on the vtable slot at `148591750` will confirm the body and its ReadBuffer dispatch logic. §17.2. |
 | ~~**OI-H2-3**~~ **ANSWERED** | ~~**Server→client response schema absent from RTTI.** No `Result`/`Response` types in the Javelin Gateway RTTI — 10 request types only. Server→client messages are deserialized differently, not instantiated as typed RTTI objects.~~ | ~~P2~~ | **ANSWERED 2026-09-04 by P2, and dissolved rather than transferred. The premise "deserialized differently" was wrong.** Response types are absent from RTTI because AWS SDK for C++ `XResult` classes are **non-polymorphic value types — no vtable, therefore no RTTI**; `XRequest` derives from the polymorphic `AmazonSerializableWebServiceRequest` and so does emit it. "10 requests, no results" is the expected shape of the SDK, not evidence of an exotic inbound path. Corroborated by `application/json` = 236 vs `application/x-protobuf` = 0, and by §16.15 having already read Javelin-family fields out of the stock `JsonView` GetString helper. **The inbound Javelin schema is JSON** and is recoverable from P0's existing plaintext captures or from `.rdata` field-name constants — neither needs a running client. §17.9. |
 | **OI-H2-4** | **Second state-machine function for states 5–8** (`QueryForRemoteConfigClass` through `WaitingForREPRequirements`) not yet located. `FUN_14644a070` only handles states 1–4 and 7–0xe. | **Unowned** | Low priority — these states are pre-connect and do not affect S1a or Track P. §17.6. |
-| **OI-P5-1** | **Is the Hub type UUID derived from the type name, or a literal from `AZ_TYPE_INFO`?** `FUN_1407fbe00` caches 16 bytes computed by `FUN_1413e84b0(buf, &DAT_147f42168, 0)`, where `147f42168` is the string **after** the type name, not the name itself. | **P6, step 1.** | **The highest-value open question on the board.** `Uuid::CreateName` → the entire ~3,600-type wire vocabulary is **computable offline** from names we already hold in the symbol dump. `Uuid::CreateString` → ~3,600 literals must be extracted from `.rdata` and paired with their names. Resolved by reading `DAT_147f42168` (name string, or `"{XXXXXXXX-…}"`?) and decompiling `FUN_1413e84b0` against the fork's `AzCore/Math/Uuid.*` — the two functions look nothing alike, so a few lines settle it. §18.3, test #68. |
+| ~~**OI-P5-1**~~ **ANSWERED** | ~~**Is the Hub type UUID derived from the type name, or a literal from `AZ_TYPE_INFO`?**~~ | ~~P6, step 1.~~ | **ANSWERED 2026-09-05 by P6: `FUN_1413e84b0` is `AZ::Uuid::CreateStringSkipWarnings`. The UUIDs are literals; the vocabulary is extracted, not computed.** `147f42168` holds `6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d`; the decompilation matches `Uuid.cpp:61–133` at `7d4f1ee6` point for point. P5 prediction 1 confirmed. **But the answer did not deliver the vocabulary the question assumed** — walking `CreateString` call sites yields the engine's `AZ_TYPE_INFO` map (5,907 types), not Hub's; Hub registers through `FUN_1407de270` with the parse inlined. §19.1, §19.3, §19.4, tests #69–#72. |
 | **OI-P5-2** | **Does GridMate replica traffic reach the world stream at all?** The replica machinery is present and stock, but the only bound chunk types found are `AzFramework::TransformReplicaChunk` and `LmbrCentral::TriggerAreaReplicaChunk` — **both stock engine components, not game content**. | **Unowned, low priority.** | P5's prediction 0 was never cleanly answered: the chunk found a third layer instead of resolving the two-way question it posed. **OI-H2-2** (`REPConnection::OnRecv` body would not resolve statically) remains the obstacle. Low priority because even if GridMate replicas do carry traffic, they carry engine transforms — game state is Hub. §18.0. |
 | **OI-P5-3** | **Does New World opt into quantizing marshalers for transforms?** GridMate's defaults are raw IEEE floats (12 B per Vector3, 48 B per Transform); compression is opt-in per DataSet. | **P3.** | Determines what a controlled-walk capture should search for. Corrects the CHUNKS P3 note (§13, row 31). §18.4. |
-| **OI-P5-4** | **Is the 8-slot vftable layout uniform across Hub types?** Everything in §18.3 rests on a single worked example, `ReplicateClient`. | **P6.** | Cheap: repeat the trace on `REPClient` (name string `147f47b10`, descriptor `14a134e00`) and compare slot count and targets. **This is a cap on every §18.3 claim until it is done** (CHARTER §4 — one example is one example). §18.3. |
+| ~~**OI-P5-4**~~ **ANSWERED** | ~~**Is the 8-slot vftable layout uniform across Hub types?**~~ | ~~P6.~~ | **ANSWERED 2026-09-05 by P6: NO.** `FragmentUpdateMsg`'s handler table at `147f44828` has **4** entries against `ReplicateClient`'s **8** at `147f42110`. **§18.3 is restated as a single-instance observation.** P6 prediction 3 falsified. Caveat: these may be different kinds of object (message handler vs type), so the claim is non-uniformity across Hub types, not that §18.3 was wrong about `ReplicateClient`. §19.7, test #77, §13. |
+| **OI-P6-1** | **Which `FragmentUpdateMsg` is `ReplicateClient`'s?** Two distinct types share the leaf name: `951ef3ed-c9a0-4e3d-a6fd-7fe0673d28d2` (hook `1407eeca0`, handler `147f44828`) and `62f68299-7bb2-4e0a-90d9-b664bd363dae` (hook `146ac5390`, handler `148578628`). `P6_PROMPT` attributes RTTI descriptor `14a134340` to `ReplicateClient::FragmentUpdateMsg`, but that descriptor's only code xref is `1407c9370`, which is neither hook. | **P7 / Step 4.** | Step 4 cannot name its target until this is settled. Do not assume the lower address is the right one. §19.5, §19.6. |
+| **OI-P6-2** | **Which registration revision does b22469132 actually send?** All three are registered — `RegistrationRequestMsg` `8673a3cc-…` (`1407f27f0`), `V2Msg` `da4e5889-…` (`1407f2a20`), `V3Msg` `0b826b33-…` (`1407f2c50`), contiguous at 0x230 spacing. | **S1a, P7 / Step 5.** | **The most S1a-actionable open item.** Registration alone does not imply use; the answer is in whichever construction site is reachable from `GameConnection` state 10 (§17.7, OI-H2-5). Cross-reference §17.3's 15-state table. §19.6. |
+| **OI-P6-3** | **Step 4 not started — the fragment message is not framed.** How a Hub message is serialized/deserialized, whether the 16-byte UUID or a negotiated index goes on the wire, how a fragment payload is delimited, and whether Hub rides inside GridMate replica chunks or beside them. | **P7.** | P6 predictions 2 and 4 remain **untested**, and prediction 0's wire question is therefore still open. Entry point: the handler vftables in §19.6, starting with `147f44828`. §19.9. |
+| **OI-P6-4** | **The 311 recovered names are not pooling-audited.** 311 named rows yield only ~288 distinct names, and MSVC `/GF` merges name literals across translation units while each type keeps its own UUID. | **P7, low priority.** | The UUID is the key and the name is a label, so this does not threaten the identity map — but a name column treated as authoritative would mis-attribute. §19.5, §19.8. |
+| **OI-P6-5** | **`*ReplicatedState` / `ComponentClientFacet_*` / `ComponentServerFacet_*` naming convention — noticed, not pursued.** The 3,482-name dump shows a component model with paired client/server halves and a replicated-state fragment per component (`AbilityComponentReplicatedState`, `AbilityComponentServerFacet_RequestApplyAbilityPoints`, …). `Replicate` and `ReplicateClient` each have a paired `::State` type. | **P3, P4.** | **Inference from naming convention, not verified.** If it holds, `*ReplicatedState` types are what `FragmentUpdateMsg` transports and P3/P4 get their targets by name. Out of P6's scope bound (actors, routing, persistence, AOI are a different chunk). §19.5, §19.6. |
 | **OI-P2-1** | **Registration mechanism unconfirmed (residual of P2-E).** P2's 3 blobs were located **as data**; nothing yet proves they are registered, or by what. `InternalAddGeneratedFile`, `AddDescriptors` and `descriptor_table` all matched **0** as literal strings — but a non-virtual free function's name need not appear in the binary at all, so **the string test cannot answer this** and P2-E is not resolved. | **Unowned, low priority.** | Resolved by XREF on the three blob VAs (`0x1486f5b60`, `0x1495ab7c0`, `0x1495b3330`) in the warm `nwly.gpr`. Whatever function references those pointers **is** the registration function, named or not; its size constants should read **1407 / 190 / 6028** as an independent check on the scanner's self-derived sizes (CHARTER §4 — two derivations, not one). **Low priority because it cannot change P2's verdict:** there is no Javelin descriptor to register regardless of what registers the three that exist. Worth doing only to close P2-E honestly. §17.9. |
 | **OI-P2-2** | **Are the 10 Javelin types in §17.5 the same REST calls P0 already decoded on TCP/443?** Their names are literal REST routes (`PostGameWorldsWorldIdCharactersRequest` = `POST /game/worlds/{worldId}/characters`, `DeleteGameCharactersCharacterIdRequest` = `DELETE /game/characters/{characterId}`, plus `PatchCharacterRequest`, `GetLoginInfoRequest`, `ListWorldsRequest`), and `application/json` = 236. Probably yes — **not checked.** | **Unowned.** | Cheap: diff the 10 type names against the routes in `p0_cold` (§16.2). If they match, **§17.5's "world message layer" framing needs its own §13 correction** and Track P's inbound problem was already solved by P0 in August. If they do not, the Javelin surface is a second JSON API on the world path and is worth its own chunk. §17.9. |
 | **OI-H2-5** | **`vtable+0xa8` on REP driver object — what triggers its non-zero return?** This is the gate between state 10 and 0xb (`WaitingForActorGameConnection`). S1a's primary open question: what must the server emit to advance the client past state 10. | **S1a** | The poll call is at `(**(code **)(*param_1->field4054_0x1000 + 0xa8))()` in `FUN_14644a070` case 10. §17.7. |
@@ -2991,3 +3012,263 @@ smoothly varying **raw float triple**. Whether New World opts in is OI-P5-3.
   example** (`ReplicateClient`) plus symbol-table aggregates. The vftable layout
   is **assumed** uniform across Hub types and **has not been checked against a
   second type** — OI-P5-4. CHARTER §4: one example is one example.
+
+---
+
+## 19. The Hub type vocabulary and the registration mechanism (P6)
+
+**Status:** Step 1 and Step 2 DONE 2026-09-05. Steps 3–5 partially done; Step 4
+not started. Static analysis of `NewWorld.exe` b22469132 in `nwly.gpr`, plus the
+Lumberyard fork at `7d4f1ee6` for AzCore. No execution, no hooking, no capture.
+Scripts run via `analyzeHeadless -readOnly -postScript`.
+
+---
+
+### 19.1 OI-P5-1 ANSWERED — `FUN_1413e84b0` is `AZ::Uuid::CreateStringSkipWarnings`
+
+**The vocabulary is extracted, not computed.** P5's prediction 1 confirmed; the
+`CreateName` branch and P6_PROMPT's Step 2a are dead.
+
+Three independent lines of evidence:
+
+1. **The operand is a UUID literal.** `DAT_147f42168` (= `147f42158 + 0x10`,
+   past `"ReplicateClient\0"`) is the 36-character string
+   `6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d`. Ghidra labels the string from
+   `147f42169`; the byte at `147f42168` is `0x36` = `'6'` and the four xrefs
+   point at `147f42168`, so the split is a display artifact.
+
+2. **The decompilation matches the fork point for point** against
+   `dev/Code/Framework/AzCore/AzCore/Math/Uuid.cpp:61–133` at `7d4f1ee6`:
+   the `strlen` branch when the length argument is 0 (`:71–74`); the
+   `len < 32 || len > 38` window (`:76`); open-brace handling (`:83–89`);
+   `i == 4` dash detection (`:94–100`); the `i == 6 || 8 || 10` dash checks,
+   emitted as `((i - 6) & ~6) == 0 && i != 12` (`:104`); `GetValue` folded to a
+   single displaced load `pcVar3[-0x73a8]` over the 22-char digit table
+   (`:45–51`); `<<= 4` then `|=` (`:119–124`); 16 iterations (`:91`).
+
+3. **Argument count.** `CreateString(const char*, size_t = 0)` is 3 args with the
+   x64 sret pointer — matching `FUN_1413e84b0(local_18, &DAT_147f42168, 0)`.
+   `CreateName(const char*)` is 2. `CreateData` is 3 but requires
+   `dataSize > 0` and returns a null Uuid otherwise (`:295`, `:322`).
+
+**Two minor divergences from the fork, noticed-not-pursued:** retail early-outs
+on an empty string as well as null, and validates each hex digit
+(`if (0xf < value)` → null Uuid) where `CreateStringSkipWarnings` at this commit
+assigns `GetValue`'s result unchecked. Probably an AzCore version delta rather
+than a New World change; not established.
+
+**`FUN_1407fbe00` is an MSVC thread-safe function-local static** (`/Zc:threadSafeInit`):
+TLS `_Init_thread_epoch` at offset `0x3684` compared against guard
+`DAT_14a2e7760`, `FUN_147aa6598` = `_Init_thread_header`, named
+`_Init_thread_footer`, 16-byte copy into `_DAT_14a2e7750`. Source is
+approximately:
+
+```cpp
+static const Uuid& TypeId() {
+    static Uuid s_id = Uuid::CreateString("6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d");
+    return s_id;
+}
+```
+
+### 19.2 Two corrections to P6_PROMPT.md, both load-bearing
+
+**`CreateName` is SHA-1, not MD5.** P6_PROMPT Step 1.2 says MD5. At `7d4f1ee6`,
+`CreateName` (`Uuid.cpp:285`) forwards to `CreateData` (`:293–322`), which
+constructs a `Sha1`, calls `ProcessBytes`/`GetDigest` into five `u32`s and writes
+them big-endian; `AzCore/Math/Sha1.h` is included at `:15` and there is no MD5
+include. The version nibble written is 5 (`data[6] &= 0x5F; |= 0x50`, `:315–317`,
+comment `VER_NAME_SHA1`). `VER_NAME_MD5 = 3` (`Uuid.h:40`) appears only as a
+decode case in the version getter (`Uuid.cpp:386`) and is never written.
+
+**Why this mattered:** Step 2a instructs a session to implement `CreateName` from
+the fork source. A session trusting the prompt would have implemented MD5, failed
+to reproduce the cached bytes, and had a live path to concluding "not
+`CreateName` after all" — a false negative on OI-P5-1 that looks like a clean
+result.
+
+**The literals are not uniformly brace-delimited.** Step 1.1 and Step 2b assume
+`"{XXXXXXXX-...}"`. Both forms are present and both are parsed: `ReplicateClient`
+and `REPClient` are unbraced, `PingMsg` and 5,930 others are braced. Brace style
+is a per-translation-unit authoring habit and is **not** a discriminator of
+anything. A brace-anchored `.rdata` scan would have returned a fraction of the
+set.
+
+### 19.3 The `AZ_TYPE_INFO` map — 5,907 types, and what it is NOT
+
+`FUN_1413e84b0` has **15,919 references**, 15,914 of them call/jump. Walking them
+and resolving the `rdx` operand recovers **5,907 accessors** with 99.4% site
+resolution (101 unresolved, all `MOV`/`XOR`/`CMOV` into `rdx`, i.e. runtime
+strings). Each has a single-use literal, a `.rdata` name string within 0–7 bytes,
+and the magic-static shape. Output: `hub_vocab3_candidates.csv`.
+
+**This is the engine's `AZ_TYPE_INFO` vocabulary, not Hub's.** AzCore, GridMate,
+game components and Hub all share the idiom, so the map spans the whole binary.
+**None of the ten session-layer message types appear in it.** A later session
+finding a 5,907-row file named `hub_vocab*` must not assume it holds the Hub
+vocabulary.
+
+**Tooling trap worth recording:** Ghidra's flat-API `getReferencesTo()` caps its
+return array at **4,096** entries and truncates silently. The first run reported
+4,092 sites as if complete, sampling only the low `.text` block. Use
+`ReferenceManager.getReferencesTo()`, which returns an unbounded iterator.
+
+### 19.4 The registrar — `FUN_1407de270`, the actual Hub mechanism
+
+Hub message types do **not** register through the shared `CreateString`
+accessor. `InstallRegistrationHook<T>` bodies are magic statics that:
+
+1. build the type name as an `AZStd::string` (heap or inline);
+2. **parse the UUID literal inline** — `CreateString` unrolled, so there is no
+   call for a call-site scan to find;
+3. call **`FUN_1407de270(&out, uuid_bytes, &name)`** — the registrar;
+4. allocate a handler object via `FUN_147aa6610(0x10)`, store a vftable pointer
+   in it, and install it at `out + 0x48`, releasing any prior occupant through
+   its own virtual;
+5. register an `atexit` destructor.
+
+Worked examples read in full: `FUN_1407eeca0` (`FragmentUpdateMsg`),
+`FUN_1407f0fb0` (`PingTrait`), `FUN_1408947a0` (anonymous).
+
+**`FUN_1407de270` has 3,512 references, 3,511 call/jump** — against **3,482**
+`InstallRegistrationHook` symbol instantiations, two independently derived counts
+30 apart. This is the Hub type set.
+
+### 19.5 The vocabulary — 3,509 identities; names exist for 311 by design
+
+Walking the registrar's call sites recovers **3,509 distinct UUIDs from 3,510
+rows** — essentially one identity per registered Hub type. Output:
+`hub_vocabulary.csv` (uuid, literal VA, name, handler vftable, hook VA, site).
+
+**311 named, 3,199 anonymous, and the anonymity is deliberate.** The named hooks
+build a real string (`local_18 = 9`, `local_10 = 0xf`, buffer holding
+`"PingTrait"` — `FUN_1407f0fb0`). The anonymous hooks construct an **explicitly
+empty** string and pass it anyway (`local_18 = 0`, `local_28 = 0`,
+`local_10 = 0xf` — `FUN_1408947a0`), and are otherwise structurally identical.
+**The names do not exist in the binary for those 3,199 types**, so no extraction
+strategy could recover them. Four unrelated approaches converging on the same
+8.9% was the data constraining the result, not the tooling.
+
+**The split is regional, not scattered.** Named hooks occur only in `1407xxxxx`
+(92) and `146axxxxx` (219); every other region (`1416`, `1468`, `1434`, `143e`,
+`1429`, `1428`, `1448`, and a long tail) is entirely anonymous. The two named
+regions are exactly the ones holding `ReplicateClient`, `REPClient`, the
+registration messages, `FragmentUpdateMsg` and the connection messages.
+
+**Finding: Hub attaches runtime names only to the wire-facing session and message
+layer; everything else is identified by UUID alone.** The anonymous set also uses
+uppercase UUID literals against the named set's lowercase — a different source
+convention, consistent with generated code.
+
+**Name collisions are real.** 311 named rows yield only ~288 distinct names, and
+MSVC `/GF` identical-string-pooling merges name literals across translation units
+while each type keeps its own UUID literal. **The UUID is the key; the name is a
+label.** Two distinct `FragmentUpdateMsg` types and two distinct `PingMsg` types
+exist.
+
+### 19.6 Step 5 — the session-layer types, with identities
+
+The most S1a-actionable output of the chunk. All recovered from the registrar
+map with hook and handler addresses.
+
+| Type | UUID | Hook | Handler vftable |
+|---|---|---|---|
+| `RegistrationRequestMsg` | `8673a3cc-2848-4c87-aa72-cc860589d1b5` | `1407f27f0` | `147f47108` |
+| `RegistrationRequestV2Msg` | `da4e5889-a65c-4480-8642-0278160125a7` | `1407f2a20` | `147f471f0` |
+| `RegistrationRequestV3Msg` | `0b826b33-89f5-49e0-b8cb-fe4433427778` | `1407f2c50` | `147f47278` |
+| `RegistrationResponseMsg` | `104145a7-ff95-44f1-9468-21fb41c8ac2b` | `1407f2e80` | `147f46910` |
+| `TimeSynchMsg` | `038cd847-0653-4243-9a26-936e3bd7f312` | `1407f6a30` | `147f46648` |
+| `ClientConnectionMsg` | `c4f1e7b5-d502-49f4-ac71-27928c9d25c5` | `1407ec310` | `147f483d8` |
+| `ClientDisconnectionMsg` | `cabd72ff-cca0-4c8a-804e-c585b386dcfe` | `1407ec550` | `147f48688` |
+| `PingMsg` | `6a379fb8-0bdd-43a1-ab3e-9843d7be8cd3` | `1407f0940` | `147f46d38` |
+| `PingMsg` (second type) | `519a3d71-f901-46b8-8969-f47b6fd492bc` | `146aceec0` | `148575db0` |
+| `PingRequestMsg` | `ad4c28bd-4208-4b47-9679-9a46dd9e5287` | `1407f0b60` | `147f478c0` |
+| `PingResponseMsg` | `259734dd-9277-4e08-b11f-1ab9e71de1be` | `1407f0d80` | `147f47ad8` |
+| `PingTrait` | `a535df54-830c-4bef-a8ae-2020c796a806` | `1407f0fb0` | `147f46f28` |
+| `PingTrait::State` | `e43d64aa-fa73-403c-a5c4-a184f7352437` | `1407f58b0` | `147f47c08` |
+| `REPClient` | `532e765a-3393-4a50-9010-b73c627512b2` | `1407f1870` | `147f45570` |
+| `REPClient::State` | `91a9cf78-0214-461b-8471-1b0e96224da9` | `1407f5f50` | `147f46ac0` |
+| `Replicate` | `ff1ec011-3d18-4f09-a0ac-3fb27b313984` | `1407f3500` | `147f420d0` |
+| `Replicate::State` | `d3d3e94e-2966-4f14-8ffa-dd3b61161d5c` | `1407f65e0` | `147f435d0` |
+| `ReplicateClient` | `6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d` | `1407f3720` | `147f43b08` |
+| `ReplicateClient::State` | `44e6eeea-541f-4534-a540-a5a08f377907` | `1407f6800` | `147f44978` |
+| `FragmentUpdateMsg` | `951ef3ed-c9a0-4e3d-a6fd-7fe0673d28d2` | `1407eeca0` | `147f44828` |
+| `FragmentUpdateMsg` (second) | `62f68299-7bb2-4e0a-90d9-b664bd363dae` | `146ac5390` | `148578628` |
+| `FragmentUpdatesMsg` (plural) | `560a34b3-9acc-473f-93a4-a62a78de39a2` | `146ac55c0` | `148578ac0` |
+| `DebugPingMessage` | `fa98cc6a-2e38-4d8c-9346-6f348c3df1e0` | `146ac3ff0` | `148574b68` |
+| `PersistencePingMessage` | `6057eb60-bac3-4fa7-a06d-3d013c09be21` | `146ace390` | `14857efc8` |
+
+**All three registration revisions exist and are registered.** Their hooks are
+contiguous — `1407f27f0`, `1407f2a20`, `1407f2c50`, 0x230 apart, one emission
+run. **Which revision b22469132 actually sends is NOT answered** (OI-P6-2); this
+establishes only that all three are registered.
+
+`Replicate` and `ReplicateClient` each have a paired `::State` type, matching the
+`*ReplicatedState` convention in the name dump.
+
+### 19.7 OI-P5-4 ANSWERED — the vftable layout is NOT uniform
+
+`FragmentUpdateMsg`'s handler table at `147f44828` has **4 entries**
+(`FUN_1407c7db0`, `FUN_1407c7df0`, `LAB_1407c7b40`, `LAB_1407c7b50`) against
+`ReplicateClient`'s **8 slots** at `147f42110` (§18.3).
+
+**§18.3's 8-slot layout is a single-instance observation and is restated as
+such.** Caveat recorded honestly: these may be different *kinds* of object — a
+message handler versus a type — so the claim is that layout is not uniform
+across Hub types, not that §18.3 was wrong about `ReplicateClient`.
+
+Related correction: §18.3 says the accessor "caches 16 bytes." True at runtime.
+**The slot is a lazily-initialised function-local static and reads as zero in the
+static image** — `_DAT_14a2e7750` is all zeros on disk. A static reader who goes
+to the address will otherwise think the claim is false. This also kills any
+notion of harvesting the vocabulary from `.data`.
+
+### 19.8 Three dead routes — do not retry
+
+Recorded so a successor does not spend the same passes.
+
+1. **Name↔UUID by `.rdata` adjacency.** Works for unpooled top-level types
+   (gap 0–7) and fails otherwise: `/GF` string pooling merges name literals
+   across translation units (`FragmentUpdateMsg` at `147f423d0` has one string,
+   two xrefs, two owning types), and anonymous types have no name at all.
+   `REPClient::State` at `147f48070` is followed by *two* literals.
+
+2. **`InstallRegistrationHook<T>` RTTI descriptors → hook.** The 3,482
+   descriptors carry the qualified type name in mangled form, but they describe
+   the `<lambda_1>` inside the hook — `std::function` type-erasure machinery —
+   and each has exactly one code xref that lands nowhere near its hook. Two
+   samples: `14a134340` → `1407c9370`; `14a134b30` → `1407c3a70`. Neither
+   appears in the registrar map. **There is no path from descriptor to hook.**
+
+3. **Hook → vftable → COL → type descriptor.** The identity accessors are not
+   virtual: every one of `FUN_1407fbe00`'s 20+ xrefs is a `CALL`, none from
+   `.rdata`. They do not appear in vftables, so the standard MSVC RTTI chain
+   does not apply.
+
+### 19.9 Predictions (CHARTER §4)
+
+- **0 (premise) — FALSIFIED, in the manner the prompt required be left open.**
+  Not "UUID on the wire" vs "negotiated index" but a **fourth possibility**: two
+  distinct identity mechanisms coexist, and the one P6 first mapped
+  (`AZ_TYPE_INFO` via shared `CreateString`) is **not** the one the message layer
+  uses. Whether the UUID reaches the wire at all remains untested (OI-P6-5).
+- **1 — CONFIRMED.** `CreateString`, not `CreateName`. §19.1.
+- **2 (negotiated index) — UNTESTED.** Step 4 not started.
+- **3 (uniform 8-slot vftable) — FALSIFIED.** §19.7.
+- **4 (Hub rides beside GridMate replicas) — UNTESTED.** Step 4 not started.
+
+### 19.10 Method note — the session's own error rate
+
+Six hypotheses were advanced and falsified before the mechanism was found:
+brace style as a discriminator; two populations split on braces; qualified names
+being the emitted form; the caller-column join; a second UUID parser; small-string
+capacity explaining the missing names. **Every one generalised from a single
+example** — the same failure §18.6 flagged as P5's cap and the same one test #68
+records.
+
+Contributing factor worth recording: the analyst had no direct interface to
+Ghidra, so each hypothesis cost a full round trip to test. The scripts that
+worked were mechanical once the anchor was known; the anchoring was not. A
+delegated agent could run the enumeration but would not supply the "how many
+examples is this resting on" check, and would produce a clean-looking map with an
+unaudited name column.
+
