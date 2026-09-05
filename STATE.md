@@ -5,7 +5,7 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-09-04** |
-| Written against commit | **FILL ON COMMIT** (parent: 7882428) |
+| Written against commit | f8a536b |
 | Section count (every `## ` header, this one included) | **21** (§16.15 and §17.9 are `###` subsections; **§18 is a new `## ` added by P5**) |
 | Highest test number (§14) | **68** |
 | Correction row count (§13) | **31** |
