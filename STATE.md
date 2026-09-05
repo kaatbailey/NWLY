@@ -5,11 +5,11 @@
 | Field | Value |
 | ----- | ----- |
 | Last updated | **2026-09-04** |
-| Written against commit | 7882428 |
-| Section count (every `## ` header, this one included) | **20** (§16.15 is a `###` subsection, not a new `## `) |
-| Highest test number (§14) | **65** |
-| Correction row count (§13) | **29** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, **P2** |
+| Written against commit | **FILL ON COMMIT** (parent: 7882428) |
+| Section count (every `## ` header, this one included) | **21** (§16.15 and §17.9 are `###` subsections; **§18 is a new `## ` added by P5**) |
+| Highest test number (§14) | **68** |
+| Correction row count (§13) | **31** |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, P2, **P5** |
 | Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
@@ -192,6 +192,19 @@ understand it. **This instrument now exists and works** (T4, §7–§9).
   `XResult` types are non-polymorphic → no RTTI). Track P retargets onto GridMate
   `ReplicaChunk` marshalling, for which we hold the source. §17.9.
 
+- **P5 — replica/chunk model (source-first + static retail).** Documented
+  GridMate's replica wire format from the pinned fork — **and found it is not
+  where the game's state lives.** There is a **third layer: `Amazon::Hub`**,
+  Amazon's own actor/fragment replication framework above GridMate, with ~3,600
+  registered types, **3,629 symbols and zero functions** (fully inlined). Game
+  state is Hub fragments; the inbound world-state update is
+  `ReplicateClient::FragmentUpdateMsg`; the world handshake is enumerated by name
+  (`REPClient::RegistrationRequestMsg`/`V2`/`V3`, `RegistrationResponse`, `Ping`,
+  `TimeSynch`). **P5's prediction 0 asked the wrong question** and prediction 3
+  was falsified (transforms are **raw IEEE floats**, not quantized). **Also
+  corrected P2's own §17.9** on `InitializeReplicatedFields` (§13). Opens
+  OI-P5-1…4 and **P6**. §18.
+
 **Open, in dependency order:** H1 → H3 → P-track → S-track. D1 can start any
 time. **T3 complete 2026-08-29 (§12A). T5 complete 2026-08-29 (§12B) — the
 T-track is finished. H2 complete 2026-09-04 (§17) — world-message dispatch map
@@ -199,7 +212,10 @@ done, Track P prioritisation and S1a handoff written. H-track active front is
 now H1. P2 complete 2026-09-04 (§17.9) — protobuf ruled out as a route to the
 world protocol; Track P retargeted onto GridMate replica marshalling, which is
 readable from the reference fork source and is therefore immune to the 2027-01-31
-sunset.**
+sunset. **P5 complete 2026-09-04 (§18) — and that retarget was right by accident:
+game state is not GridMate replicas either, but `Amazon::Hub`, a third layer
+above them. Track P's front is now P6.** The Hub route is also static and
+sunset-immune.**
 
 **Build is pinned.** buildid 22469132, depot manifests recorded, `Bin64/` byte-copied
 with a 22-file sha256 baseline. See §5. This closes the only item in the project
@@ -1536,6 +1552,8 @@ claim adds a row here rather than deleting the claim.
 | "Separately **falsified in the strong form**: the address is *not* in any readable auth body — exhaustive search across all exported HTTP objects and decrypted records … returned nothing but two false hits inside `.dds` textures." — §16.5, prediction 1 (P0, 2026-08-30). | **TRUE AS SCOPED, SUPERSEDED AS PHRASED.** The search was exhaustive over the bodies readable *at that time*, and the one body that carries the address was precisely the one that did not decrypt. P0b decrypted it; the address is there, in plaintext ASCII, as `Token.RepAddress`. This row is not an error — the scope qualifier was doing real work — but the phrase "not in any readable auth body" invites the wrong generalisation on re-reading, and **prediction 1 is now CONFIRMED** (§16.10, §16.14). Lesson, and it is §16.8 from the other direction: an exhaustive search is bounded by what the instrument could open, and that bound belongs **inside the sentence**, not in a caveat elsewhere. |
 
 | "**Protobuf choke point (FIND-2 / P2):** All 10 types go through AWS SDK model serialization. The move-constructor family (`FUN_146406a90` and siblings) embed named Javelin model vftables directly. P2 should target the AWS SDK `SerializePayload` / `GetBody` path on these model types to locate the protobuf schema boundary." — §17.5 (H2, 2026-09-04). | **FALSE — there is no protobuf schema boundary on that path, and no protobuf anywhere near the Javelin models.** P2 scanned the entire binary the same day and recovered **3** `FileDescriptorProto` blobs: `campfire_event_default.proto` (Campfire telemetry), `google/protobuf/empty.proto`, `google/protobuf/descriptor.proto`. No Javelin descriptor, no `service` block, **`application/x-protobuf` = 0** against **`application/json` = 236**. The AWS SDK path is **JSON**, which §16.15 had already demonstrated from the other direction by reading queue-`Token` fields out of the stock `JsonView` GetString helper — the evidence was in this file before H2 wrote the claim. Protobuf in `NewWorld.exe` serves Campfire telemetry and nothing else. **Lesson: "X and Y are both present in the binary" is not evidence that X serialises Y.** §17.9. |
+| "`InitializeReplicatedFields` **94** — matches T1/§10's independently-derived ~94, an instrument cross-check that passed" and, in the Track P retarget, "The world stream is **GridMate `ReplicaChunk` marshalling** (`ReplicaChunk` 23, `InitializeReplicatedFields` 94, plus §10's `VTransformReplicaChunk` …)" — §17.9 (P2, 2026-09-04). | **WRONG — `InitializeReplicatedFields` is not a GridMate symbol.** It is a virtual on `Javelin::*ComponentServerFacet` classes, i.e. **`Amazon::Hub`**, and is absent from the whole of `dev/Code/Framework` (AzCore + AzFramework + GridMate) at the pinned commit `7d4f1ee6`. The count matching T1's ~94 was a genuine cross-check of the **number**; the **attribution** was inherited from §10 and never verified. Those 94 references are evidence for **Hub**, not for GridMate replicas. The retarget conclusion was therefore right by accident and for the wrong reason: Track P did need to leave protobuf, but its destination is Hub (§18), not GridMate replica marshalling. **Lesson: an instrument cross-check that confirms a number does not confirm what the number is about.** §18.0, §18.1. |
+| "Note P3 depends on this: GridMate's transform marshalers **quantize**, so a raw float triple is the wrong thing to look for." — `CHUNKS.md`, P5 stub (2026-09-04). | **FALSE for the defaults.** `Marshaler<AZ::Vector3>` writes three **raw IEEE floats** (12 bytes) and `Marshaler<AZ::Transform>` four of those (**48 bytes, uncompressed**) — `Serialize/MathMarshal.h:59,186` at `7d4f1ee6`. Quantizing marshalers exist (`Float16Marshaler`, `Vec3CompRangeMarshaler`, `TransformCompressor`, `IntegerQuantizationMarshaler`) but are **opt-in per DataSet declaration**, not the default. **P3 should search for a smoothly varying raw float triple after all.** Whether New World opts in per-DataSet is unresolved — OI-P5-3. §18.4. |
 ---
 
 ## 14. Test / capture log
@@ -1610,6 +1628,9 @@ result — so no test is silently retried and no result is remembered wrong.
 | 63 | **P2** instrument validation of `p2_scan.py` **before** it was pointed at retail (CHARTER §2/§4): (a) synthetic Javelin-shaped descriptor with nested messages, `oneof`, enum, repeated, defaults and a `service` block, butted directly against adjacent `.rdata`; (b) 171 MB haystack with six **real** Google descriptors planted at known offsets; (c) 40 MB adversarial noise seeded with decoy `.proto` paths and hand-crafted anchors. | A scanner that finds descriptors in noise is worthless; one that misses them at scale is worse. Expect full recall on (a)/(b) and zero hits on (c). | **PASSED — after two defects the controls caught.** (a) 2/2, exact offsets/VAs/sizes recovered **without any size constant**, service block round-tripped. (b) **6/6**, all sizes exact, 2 s runtime. (c) **0 false positives**. Defects found and fixed: **O(n²) extent recovery that hung** on adversarial input (now single-pass), and **35,081 false positives** — a bare `.proto` path in a strings table preceded by a byte that happens to be its length is a valid *name-only* `FileDescriptorProto`; fixed with a substance gate (must declare ≥1 message/enum/service/extension), 35,081 → 0 with no loss of recall. §17.9. |
 | 64 | **P2** whole-binary `FileDescriptorProto` scan of `NewWorld.exe` b22469132 (179,204,176 bytes, image base `0x140000000`) from the pin, `.rdata`/`.data`. | P2_PROMPT predicted 20–100 registration call sites, response types present in the blobs, and a `service JavelinGatewayService` block ("the single most valuable find P2 can make"). Runbook predicted the opposite: infrastructure namespaces only, no service block. | **All three P2_PROMPT predictions FALSIFIED; runbook P2-B/C confirmed.** **3 blobs, exact confidence:** `campfire_event_default.proto` (VA `0x1486f5b60`, 1407 B, 4 msgs), `google/protobuf/empty.proto` (`0x1495ab7c0`, 190 B), `google/protobuf/descriptor.proto` (`0x1495b3330`, 6028 B). **0 service blocks. 0 messages named `*Result`/`*Response`/`*Notification`/`*Event`.** Campfire's 4 messages are really 1 message + 1 nested struct + 2 synthetic map entries. §17.9. |
 | 65 | **P2** serialization-shape string survey of the same binary (`--diagnostics`). | If Javelin were protobuf, a protobuf content type and descriptor-registration symbols should be present in proportion to 20 `JavelinGatewayService` hits. | **Javelin is JSON.** `application/json` **236**, `application/x-protobuf` **0**, `application/octet-stream` 0. `JavelinGatewayService` 20. `InitializeReplicatedFields` **94** — matches T1/§10's independently-derived ~94, an instrument cross-check that passed. `ReplicaChunk` 23. **Instrument cap, and it binds: every search string containing `::` was matched literally and therefore misses mangled MSVC RTTI** (`JsonView` is stored as `?…@JsonView@Json@Utils@Aws@@`), so `JsonView`/`DataSetBase`/`Marshaler`/`MessageLite`/`DescriptorPool` = 0 are **artefacts of the search, not absence**. Only bare identifiers and content-type literals from this test are citable. §17.9. |
+| 66 | **P5** whole-symbol-table sweep of `NewWorld.exe` b22469132 for `InstallRegistrationHook`, `REPClient`, `ReplicateClient` and `Amazon::Hub`, via `hub_probe.py` under PyGhidra. | P5 planned to decompile a registration hook and read how Hub types identify themselves. The plan assumed the hooks exist as functions. | **They do not exist as functions at all, and the sweep is what revealed the Hub layer.** `Amazon::Hub`: **3,629 symbols, 100% `Label`**. `InstallRegistrationHook`: **3,482 symbols, 100% `Label`**. **Functions with `Hub::` in the name: 0.** Every hook is inlined into a static initializer; only the type-erased lambda's RTTI descriptor survives (`…InstallRegistrationHook<T>(void)'::__l2::<lambda_1>::RTTI_Type_Descriptor`). Descriptors are **contiguous in link order** from `14a1340c0`; name strings are **scattered per translation unit** (`s_ReplicateClient` `147f42158`, `s_REPClient` `147f47b10`, `s_Amazon::Hub::ActorRef` `14803e230`). §18.1. |
+| 67 | **P5** XREF trace from the `"ReplicateClient"` name string (`147f42158`) and the `FragmentUpdateMsg` RTTI descriptor (`14a134340`) through to executable code. | If Hub is fully inlined, XREFs on data are the only route in; expect them to converge on a shared registration routine. | **They reach the type's vftable, not a registry.** vftable `0x147f42110`, **8 slots**, ending `147f42148`; targets reached via MSVC **adjustor thunks** (`MOVSXD RAX,[RCX-4]; SUB RCX,RAX; JMP`), i.e. multiple inheritance. Slot 0 (`147f42120`) → `1407f9b60` = `return "ReplicateClient";`. Slot 1 (`147f42128`) → `FUN_1407f9f30` = **16-byte identity compare**. Slot 2 (`147f42130`) → `FUN_1407f98d0` = visitor dispatch. Both call **`FUN_1407fbe00`**, a TLS-guarded magic static caching **16 bytes** at `_DAT_14a2e7750`. Also recovered **`FUN_1407f3720`**, an **inlined hook body**, building `"ReplicateClient"` as a 15-char inline `AZStd::string`. §18.3. |
+| 68 | **P5** identify the source of the 16-byte Hub type identity: decompile `FUN_1407fbe00` and locate its hash input. | Decides whether the ~3,600-type wire vocabulary is computable offline or must be extracted literal by literal. | **UNRESOLVED — OI-P5-1, and the withdrawal is the finding.** `FUN_1407fbe00` calls `FUN_1413e84b0(buf, &DAT_147f42168, 0)`, and `147f42168` is `147f42158 + 0x10` — **past `"ReplicateClient\0"`**. The input is therefore the string **following** the type name, not the name. If `FUN_1413e84b0` is `AZ::Uuid::CreateName`, the vocabulary computes offline from names already held; if `AZ::Uuid::CreateString`, ~3,600 literal UUIDs must be extracted. **The 3-argument call with a `0` length fits `CreateString`.** The session recorded the optimistic `CreateName` reading as fact mid-analysis and **withdrew it before writing** — logged because the withdrawal, not the guess, is the result. §18.3. |
 
 ---
 
@@ -1676,6 +1697,10 @@ FIND-2 are the substitute for observing it.
 | **OI-H2-2** | **`REPConnection::OnRecv` body not resolved statically.** Ghidra treats the entry as an `UndefinedFunction` thunk at `146b717b0`; the actual callable body was not isolated. | **H1** | H1 runtime hook on the vtable slot at `148591750` will confirm the body and its ReadBuffer dispatch logic. §17.2. |
 | ~~**OI-H2-3**~~ **ANSWERED** | ~~**Server→client response schema absent from RTTI.** No `Result`/`Response` types in the Javelin Gateway RTTI — 10 request types only. Server→client messages are deserialized differently, not instantiated as typed RTTI objects.~~ | ~~P2~~ | **ANSWERED 2026-09-04 by P2, and dissolved rather than transferred. The premise "deserialized differently" was wrong.** Response types are absent from RTTI because AWS SDK for C++ `XResult` classes are **non-polymorphic value types — no vtable, therefore no RTTI**; `XRequest` derives from the polymorphic `AmazonSerializableWebServiceRequest` and so does emit it. "10 requests, no results" is the expected shape of the SDK, not evidence of an exotic inbound path. Corroborated by `application/json` = 236 vs `application/x-protobuf` = 0, and by §16.15 having already read Javelin-family fields out of the stock `JsonView` GetString helper. **The inbound Javelin schema is JSON** and is recoverable from P0's existing plaintext captures or from `.rdata` field-name constants — neither needs a running client. §17.9. |
 | **OI-H2-4** | **Second state-machine function for states 5–8** (`QueryForRemoteConfigClass` through `WaitingForREPRequirements`) not yet located. `FUN_14644a070` only handles states 1–4 and 7–0xe. | **Unowned** | Low priority — these states are pre-connect and do not affect S1a or Track P. §17.6. |
+| **OI-P5-1** | **Is the Hub type UUID derived from the type name, or a literal from `AZ_TYPE_INFO`?** `FUN_1407fbe00` caches 16 bytes computed by `FUN_1413e84b0(buf, &DAT_147f42168, 0)`, where `147f42168` is the string **after** the type name, not the name itself. | **P6, step 1.** | **The highest-value open question on the board.** `Uuid::CreateName` → the entire ~3,600-type wire vocabulary is **computable offline** from names we already hold in the symbol dump. `Uuid::CreateString` → ~3,600 literals must be extracted from `.rdata` and paired with their names. Resolved by reading `DAT_147f42168` (name string, or `"{XXXXXXXX-…}"`?) and decompiling `FUN_1413e84b0` against the fork's `AzCore/Math/Uuid.*` — the two functions look nothing alike, so a few lines settle it. §18.3, test #68. |
+| **OI-P5-2** | **Does GridMate replica traffic reach the world stream at all?** The replica machinery is present and stock, but the only bound chunk types found are `AzFramework::TransformReplicaChunk` and `LmbrCentral::TriggerAreaReplicaChunk` — **both stock engine components, not game content**. | **Unowned, low priority.** | P5's prediction 0 was never cleanly answered: the chunk found a third layer instead of resolving the two-way question it posed. **OI-H2-2** (`REPConnection::OnRecv` body would not resolve statically) remains the obstacle. Low priority because even if GridMate replicas do carry traffic, they carry engine transforms — game state is Hub. §18.0. |
+| **OI-P5-3** | **Does New World opt into quantizing marshalers for transforms?** GridMate's defaults are raw IEEE floats (12 B per Vector3, 48 B per Transform); compression is opt-in per DataSet. | **P3.** | Determines what a controlled-walk capture should search for. Corrects the CHUNKS P3 note (§13, row 31). §18.4. |
+| **OI-P5-4** | **Is the 8-slot vftable layout uniform across Hub types?** Everything in §18.3 rests on a single worked example, `ReplicateClient`. | **P6.** | Cheap: repeat the trace on `REPClient` (name string `147f47b10`, descriptor `14a134e00`) and compare slot count and targets. **This is a cap on every §18.3 claim until it is done** (CHARTER §4 — one example is one example). §18.3. |
 | **OI-P2-1** | **Registration mechanism unconfirmed (residual of P2-E).** P2's 3 blobs were located **as data**; nothing yet proves they are registered, or by what. `InternalAddGeneratedFile`, `AddDescriptors` and `descriptor_table` all matched **0** as literal strings — but a non-virtual free function's name need not appear in the binary at all, so **the string test cannot answer this** and P2-E is not resolved. | **Unowned, low priority.** | Resolved by XREF on the three blob VAs (`0x1486f5b60`, `0x1495ab7c0`, `0x1495b3330`) in the warm `nwly.gpr`. Whatever function references those pointers **is** the registration function, named or not; its size constants should read **1407 / 190 / 6028** as an independent check on the scanner's self-derived sizes (CHARTER §4 — two derivations, not one). **Low priority because it cannot change P2's verdict:** there is no Javelin descriptor to register regardless of what registers the three that exist. Worth doing only to close P2-E honestly. §17.9. |
 | **OI-P2-2** | **Are the 10 Javelin types in §17.5 the same REST calls P0 already decoded on TCP/443?** Their names are literal REST routes (`PostGameWorldsWorldIdCharactersRequest` = `POST /game/worlds/{worldId}/characters`, `DeleteGameCharactersCharacterIdRequest` = `DELETE /game/characters/{characterId}`, plus `PatchCharacterRequest`, `GetLoginInfoRequest`, `ListWorldsRequest`), and `application/json` = 236. Probably yes — **not checked.** | **Unowned.** | Cheap: diff the 10 type names against the routes in `p0_cold` (§16.2). If they match, **§17.5's "world message layer" framing needs its own §13 correction** and Track P's inbound problem was already solved by P0 in August. If they do not, the Javelin surface is a second JSON API on the world path and is worth its own chunk. §17.9. |
 | **OI-H2-5** | **`vtable+0xa8` on REP driver object — what triggers its non-zero return?** This is the gate between state 10 and 0xb (`WaitingForActorGameConnection`). S1a's primary open question: what must the server emit to advance the client past state 10. | **S1a** | The poll call is at `(**(code **)(*param_1->field4054_0x1000 + 0xa8))()` in `FUN_14644a070` case 10. §17.7. |
@@ -2698,3 +2723,271 @@ render with unresolved value types (`fields.tsv` carries the truth); the scanner
 finds descriptors **as data** and does not prove any is registered (OI-P2-1); a
 compressed or obfuscated descriptor would be invisible, and absence of a hit is
 not proof of absence.
+
+## 18. FINDINGS — P5 (replica/chunk model, source-first) — 2026-09-04
+
+**Status:** DONE, with a redirect larger than the chunk itself. Source read from
+the pinned Lumberyard fork; retail cross-check performed statically in the warm
+`nwly.gpr`. No execution, no hooking, no capture, no login. Opens **OI-P5-1…4**
+and a new chunk **P6**. Two §13 corrections, **one of them against P2's own
+§17.9**.
+
+Filed as a new `## ` section rather than a `###` under §17: the content spans two
+engines plus a newly discovered third layer and does not belong inside H2's
+dispatch map. **The `## ` count moves 20 → 21.**
+
+**Source pin:** `github.com/kaatbailey/lumberyard` @ **`7d4f1ee6`**, under
+`dev/Code/Framework/GridMate/GridMate/` and `.../AzFramework/AzFramework/Network/`.
+Verified 2026-09-04 that `Replica/ReplicaChunk.h`, `Serialize/MathMarshal.h` and
+`Serialize/CompressionMarshal.h` are **byte-identical** between `413ecaf` and
+`7d4f1ee6` — the `false_v<>` patch touched only `AzCore/RTTI/TypeInfo.h` — so
+§7's source-reading facts transfer unchanged.
+
+**Retail instrument:** `NewWorld.exe` b22469132 from the pin, warm `nwly.gpr`.
+
+### 18.0 The headline: there is a THIRD layer, and the game's state is in it
+
+P5 set out to document GridMate's replica wire format on the assumption that the
+world stream is GridMate `ReplicaChunk` marshalling. **That assumption was wrong,
+and so was the alternative the prompt offered against it.**
+
+| Layer | What it is | Status in retail b22469132 |
+|---|---|---|
+| **GridMate replicas** | Stock Lumberyard `ReplicaChunk` / `DataSet` marshalling | **Present and stock.** `AzFramework::NetworkContextChunkDescriptor` verbatim from source (`NetworkContext.h:103–119`). Bound chunk types found: `AzFramework::TransformReplicaChunk`, `LmbrCentral::TriggerAreaReplicaChunk` — **both stock engine components, not game content.** |
+| **Javelin (AWS SDK)** | JSON REST over HTTP | Auth phase. Settled by P2, §17.9. |
+| **`Amazon::Hub`** ← **NEW** | Amazon's own actor/fragment replication framework, built **above** GridMate and using it for transport only | **Where the game's state actually lives.** ~3,600 registered types. Not in the fork — Amazon-proprietary. |
+
+**P5's prediction 0 asked the wrong question.** It was written specifically to
+target the chunk's own premise, and it still failed, because it enumerated only
+two answers — "the world stream carries `ReplicaChunk` traffic" or "it does not"
+— and reality was a third layer neither option named. Every game-state type
+(`MB::*ReplicatedState`, `Javelin::*ReplicatedState`) is a **Hub fragment**.
+
+**This is the same error class as P2's, for the third time in two chunks:**
+*X is in the binary, therefore the protocol is X* (P2 → protobuf; §17.9 → GridMate;
+P5's premise → GridMate again). **Lesson, now recorded twice: a premise-targeting
+prediction must leave room for "neither — it is something not yet named."**
+Carried into P6's prediction 0.
+
+### 18.1 Amazon::Hub — structure
+
+**Hub is entirely inlined. There is not one named Hub function in the binary.**
+
+| Query | Result |
+|---|---|
+| Symbols matching `Amazon::Hub` | **3,629 — all `Label`, zero `Function`** |
+| Symbols matching `InstallRegistrationHook` | **3,482 — all `Label`, zero `Function`** |
+| Functions with `Hub::` in the name | **0** |
+
+Every `InstallRegistrationHook<T>` is inlined into a static initializer. What
+survives is the RTTI descriptor of the type-erased lambda each hook constructs:
+
+```
+`bool __cdecl Amazon::Hub::InstallRegistrationHook<T>(void)'::__l2::<lambda_1>::RTTI_Type_Descriptor
+```
+
+`?1` / `__l2` marks a function-local magic static. **Consequence: hook bodies
+cannot be found by name, and XREFs on descriptors and name strings are the only
+doors into the layer.** (Test #66.)
+
+**Two address regions, two different orderings:**
+
+- **RTTI descriptors — contiguous, in LINK order**, from `14a1340c0` upward,
+  spaced 0x60–0x90 apart. Link order mirrors translation-unit order, which is why
+  related services cluster (§18.2).
+- **Name strings — scattered, per translation unit.** `s_ReplicateClient`
+  `147f42158`; `s_REPClient` `147f47b10` (~0x5A00 away);
+  `s_Amazon::Hub::ActorRef` `14803e230` (a third neighbourhood entirely).
+  **A single contiguous dump will not enumerate the vocabulary.**
+
+**The registration shape is uniform:** each service registers `X`, then
+`X::State`, then each `X::*Msg` — a service, its state fragment, its messages.
+
+### 18.2 The world-session surface — one contiguous ~0xA00-byte neighbourhood
+
+The entire replication and session surface sits together in link order:
+
+| VA | Type |
+|---|---|
+| `14a134340` | **`ReplicateClient::FragmentUpdateMsg`** |
+| `14a1343c0` | `ReplicateClient::State` |
+| `14a134430` | `ReplicateClient` |
+| `14a134498` | `ReplicateClient::ReplicateClient(void)` — ctor lambda |
+| `14a1344e0` | `Replicate::UnregisterProxyMsg` |
+| `14a134560` | `Replicate::UnregisterFragmentAccessMsg` |
+| `14a1345e0` | `Replicate::RegisterFragmentAccessMsg` |
+| `14a134660` | `Replicate::State` |
+| `14a1346d0` | `Replicate` |
+| `14a134730` | `Amazon::Hub::ASC_UnregisterAllFragmentsAccess` |
+| `14a1347b0` | `Amazon::Hub::ASC_RegisterAllFragmentsAccess` |
+| `14a134870` | `REPConnectionListener::ClientDisconnectionMsg` |
+| `14a134900` | `REPConnectionListener::ClientConnectionMsg` |
+| `14a134980` | `REPConnectionListener::State` |
+| `14a1349f0` | `REPConnectionListener` |
+| `14a134ab0` | **`REPClient::RegistrationRequestV3Msg`** |
+| `14a134b30` | **`REPClient::RegistrationRequestV2Msg`** |
+| `14a134bb0` | **`REPClient::RegistrationRequestMsg`** |
+| `14a134c30` | `REPClient::PingMsg` |
+| `14a134ca0` | **`REPClient::RegistrationResponseMsg`** |
+| `14a134d20` | `REPClient::TimeSynchMsg` |
+| `14a134d90` | `REPClient::State` |
+| `14a134e00` | `REPClient` |
+| `14a134e60` | `REPClient::REPClient(void)` — ctor lambda |
+
+**`Replicate` / `ReplicateClient` are a server/client service pair**, and
+**`ReplicateClient::FragmentUpdateMsg` is the inbound world-state update** — the
+server→client direction the project has been chasing since OI-H2-3, now with a
+name and an address.
+
+**For S1a this is the most concrete target the project has ever had:** the world
+handshake enumerated by name, in **three versioned revisions**
+(`RegistrationRequestMsg` / `V2Msg` / `V3Msg`), plus `RegistrationResponseMsg`,
+`PingMsg`, `TimeSynchMsg`, and the connection lifecycle
+(`REPConnectionListener::ClientConnectionMsg` / `ClientDisconnectionMsg`). This
+maps onto §17.3's 15-state GameConnection table. **Which revision b22469132
+actually sends is unresolved — P6 step 5.**
+
+Both `REPClient::REPClient(void)` and `ReplicateClient::ReplicateClient(void)`
+carry lambda descriptors, so these services register something **at construction
+time** as well as via the static hooks.
+
+### 18.3 Hub type identity — a 16-byte `AZ::Uuid`, source UNRESOLVED
+
+Worked example, `ReplicateClient` (test #67).
+
+**vftable at `0x147f42110`, 8 slots**, ending `147f42148` (`DAT_147f42150` begins
+the next structure). Slots reach their targets through MSVC **adjustor thunks**
+(`MOVSXD RAX,[RCX-4]; SUB RCX,RAX; JMP …`) — multiple inheritance.
+
+| Slot VA | Thunk | Target | What it does |
+|---|---|---|---|
+| `147f42120` | `LAB_1407c4b28` | `1407f9b60` | `return "ReplicateClient";` — **the type's own name** |
+| `147f42128` | `LAB_1407c4b34` | `FUN_1407f9f30` | identity compare — two 8-byte halves, i.e. **16 bytes** |
+| `147f42130` | `LAB_1407c4b40` | `FUN_1407f98d0` | visitor / apply, dispatching through a function pointer |
+| `147f42138`, `147f42140` | `LAB_1407c4b58` | (shared) | — |
+| `147f42148` | — | `FUN_1407c2fd0` | — |
+
+**The vftable and the type's name strings are adjacent** (`0x147f42110` vs
+`0x147f42158`), which is why name strings cluster per translation unit rather
+than in one table (§18.1).
+
+**`FUN_1407fbe00` produces the identity.** A TLS-guarded magic static
+(`_tls_index`, `DAT_14a2e7760`, `_Init_thread_footer`): computes **four
+`undefined4` = 16 bytes** exactly once, caches at `_DAT_14a2e7750`, returns its
+address. Both slot 1 and slot 2 call it. **16 bytes is `AZ::Uuid`.**
+
+```c
+puVar1 = (undefined4 *)FUN_1413e84b0(local_18, &DAT_147f42168, 0);
+```
+
+**UNRESOLVED — OI-P5-1, and it is the highest-value open question on the board.**
+`147f42168` is `147f42158 + 0x10` — i.e. **past `"ReplicateClient\0"`** (15 chars
+plus terminator). The hash input is therefore **the string that follows the type
+name, not the type name itself.** Two readings, with opposite consequences:
+
+| If `FUN_1413e84b0` is… | Then `DAT_147f42168` is… | Consequence |
+|---|---|---|
+| `AZ::Uuid::CreateName` | a name string | **The vocabulary is computable offline.** ~3,600 type names are already in hand from the symbol dump; run them through the same digest and the full name↔UUID map falls out. No extraction needed. |
+| `AZ::Uuid::CreateString` | a **literal** `"{XXXXXXXX-XXXX-…}"` emitted by `AZ_TYPE_INFO` | **Not computable.** ~3,600 literal UUIDs must be extracted from `.rdata` and paired with their names across scattered neighbourhoods. |
+
+The 3-argument call with a `0` third parameter fits `CreateString(str, len=0)`.
+**The session recorded the optimistic `CreateName` reading as fact mid-analysis
+and withdrew it before writing this section** — logged because the withdrawal,
+not the guess, is the result. Resolved by reading `DAT_147f42168` and decompiling
+`FUN_1413e84b0` against the fork's `AzCore/Math/Uuid.*`. **P6 step 1.**
+
+**Worked example of an inlined hook body: `FUN_1407f3720`.** TLS magic static
+(`DAT_14a2e7790`); builds `"ReplicateClient"` inline as an `AZStd::string` —
+`0x746163696c706552`, `0x696c4365`, `0x6e65`, `0x74`, `\0`, with length and
+capacity both `0xf` — then loops over `(&DAT_147f42168)[i]`, the same following
+string. **This is one of the `InstallRegistrationHook` bodies that has no symbol**
+(§18.1), recovered only by XREF.
+
+### 18.4 GridMate replica wire format — documented, and it is not the game's
+
+Read from the pin; correct as far as it goes, but see §18.0 — this describes the
+layer carrying **engine** components, not game state.
+
+**Replica envelope** (`Replica/Replica.cpp:541`, `Replica::Marshal`):
+
+```
+ReplicaId
+payloadLen            VLQ, in BITS          <- PackedSize
+chunkManifest         VLQ u64 bitmask       <- which chunk slots follow
+  per set bit:
+    chunkLen          VLQ, in BITS
+    chunkPayload:
+      [ChunkTypeId : AZ::Crc32]             <- only when IncludeCtorData
+      changebits    VLQ u32                 <- dirty DataSet mask
+      dirty DataSets, in index order
+      RPCs
+```
+
+**`PackedSize` is bit-granular, not byte-granular** (`Serialize/PackedSize.h`,
+`m_totalBits`), and `Marshaler<PackedSize>` writes **the bit count**, VLQ-encoded.
+**A decoder reading these as byte lengths desyncs immediately** — the single most
+dangerous gotcha in the format.
+
+**GridMate's VLQ is not protobuf's varint.** Length is signalled by the high bits
+of the *first* byte; payload bits pack low-first across the remainder
+(`Serialize/CompressionMarshal.h:345`):
+
+| First byte | Total bytes | Value bits |
+|---|---|---|
+| `< 0x80` | 1 | 7 |
+| `0x80–0xBF` | 2 | 14 |
+| `0xC0–0xDF` | 3 | 21 |
+| `0xE0–0xEF` | 4 | 28 |
+| `0xF0+` | 5 | 32 |
+
+**Chunk type id is `AZ::Crc32`** — `typedef AZ::Crc32 ReplicaChunkClassId`
+(`Replica/ReplicaDefs.h`). *P5 prediction 1 CONFIRMED.*
+
+**DataSets are dirty-bit gated** — a VLQ-encoded changebits mask, only set
+members written (`Replica/ReplicaChunk.cpp:339`, `MarshalDataSets`).
+*P5 prediction 2 CONFIRMED.*
+
+**Reserved command IDs** (`ReplicaDefs.h`): `Cmd_Greetings`, `Cmd_NewProxy`,
+`Cmd_DestroyProxy`, `Cmd_NewOwner`, `Cmd_Heartbeat`, `RepId_SessionInfo`. Note
+the encoding trick recorded in the source: *a CmdId above
+`Max_Reserved_Cmd_Or_Id` is implicitly `UpdateReplica`, saving a byte per update.*
+
+**P5 prediction 3 FALSIFIED — transforms are NOT quantized by default.**
+`Marshaler<AZ::Vector3>` writes **three raw IEEE floats, 12 bytes**;
+`Marshaler<AZ::Transform>` is four Vector3s — **48 bytes, uncompressed**
+(`Serialize/MathMarshal.h:59,186`). Quantization exists — `Float16Marshaler`,
+`Vec3CompRangeMarshaler`, `QuatCompNormQuantizedMarshaler`, `TransformCompressor`,
+`IntegerQuantizationMarshaler` — but is **opt-in per DataSet declaration**.
+**This bears directly on P3:** a controlled-walk capture should look for a
+smoothly varying **raw float triple**. Whether New World opts in is OI-P5-3.
+§13, row 31.
+
+### 18.5 What P5 unblocks and redirects
+
+- **P6 opens** — the Hub message layer, everything in §18.1–18.3. **The Track P
+  front.**
+- **Track P retargets again**, off GridMate replicas and onto Hub. §17.9's
+  retarget was right to leave protobuf and wrong about the destination (§13).
+- **For S1a:** the world handshake is enumerated by name (§18.2), and the
+  server→client state update has a name — `ReplicateClient::FragmentUpdateMsg`.
+- **For P3:** look for raw float triples, not quantized ints (§18.4).
+- **OI-H2-3 does not reopen.** P2 answered it for the Javelin direction; §18.2
+  supplies the world-state half. The closed row should carry a pointer to §18.2.
+
+### 18.6 Instrument notes and caps
+
+- Ghidra 11.3+ replaced the Jython console with **PyGhidra**; launch via
+  `/opt/ghidra/support/pyghidraRun`, not `ghidraRun`. On this machine Ghidra
+  lives at `/opt/ghidra`.
+- **The PyGhidra console mangles multi-line pastes** — it strips indentation and
+  strands the prompt at `...`, after which every subsequent line appends to a
+  broken statement. **Run scripts from `~/ghidra_scripts` via Script Manager
+  instead.** `hub_probe.py` is the one used here.
+- **The Symbol Tree shows namespaces (`{}` icons), not functions.** Symbols
+  matching a template name may be `Label` only, with no code attached. **Use the
+  Symbol Table and read the Type column.** The session lost time to this twice.
+- Whole-symbol-table sweeps take 1–5 minutes on this binary.
+- **Cap, and it binds:** every §18.1–18.3 finding comes from **one worked
+  example** (`ReplicateClient`) plus symbol-table aggregates. The vftable layout
+  is **assumed** uniform across Hub types and **has not been checked against a
+  second type** — OI-P5-4. CHARTER §4: one example is one example.

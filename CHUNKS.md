@@ -92,6 +92,37 @@ the ready-to-paste prompt for each chunk.
 > T5/§12B. Unblocks P2 and S1a's send-side. No finding altered, no chunk ticked or
 > un-ticked — this only adds a prompt and points the Order at it.
 
+> **Eighth amendment, 2026-09-04 — P5 done, P6 opened, and the SAME ERROR CLASS
+> CAUGHT A THIRD TIME.** P5 set out to document GridMate's replica wire format and
+> found that **the game's state does not live there either**: there is a third
+> layer, **`Amazon::Hub`**, above GridMate — ~3,600 registered types, **3,629
+> symbols and zero functions**, entirely inlined. STATE **§18**.
+>
+> **P5's prediction 0 was written specifically to target its own premise, and it
+> still failed**, because it enumerated only two answers — the world stream
+> carries `ReplicaChunk` traffic, or it does not — and reality was a third layer
+> neither option named. That is *X is in the binary, therefore the protocol is X*
+> for the **third time in two chunks** (P2 → protobuf; §17.9 → GridMate; P5's own
+> premise → GridMate again). **The rule this file now carries: a
+> premise-targeting prediction must leave room for "neither — it is something not
+> yet named."** It is written into P6's prediction 0.
+>
+> Changes: **P5 row ticked** with its verdict and a pointer to §18, note rewritten
+> in the same edit. **P6 row added as the Track P front.** **`P6_PROMPT.md` added
+> to the standalone inventory at creation time** — the fourth chance to not repeat
+> the §6.7 omission, and the second time running it has been taken. Order item 4a
+> marked DONE and **4b added**; the closing "Next is P5" superseded. **The P5 stub
+> and P3's dependency note corrected**: GridMate's default transform marshalers
+> write **raw IEEE floats**, not quantized values (STATE §13), which changes what
+> P3 should look for.
+>
+> **P5 also corrected P2's §17.9**, written the previous day: the 94
+> `InitializeReplicatedFields` references are **Hub** symbols, absent from all of
+> `dev/Code/Framework`, and never supported the GridMate retarget. The retarget
+> was right to leave protobuf and wrong about the destination. *Lesson recorded in
+> STATE §13: an instrument cross-check that confirms a number does not confirm
+> what the number is about.*
+
 > **Seventh amendment, 2026-09-04 — H2 and P2 both complete, and TWO FALSE `[x]`
 > MARKS REPAIRED. This is the failure this file's own repair note describes,
 > arriving a third time and in its worse form.** On 2026-08-30 the recorded failure
@@ -244,7 +275,7 @@ document, it should be the charter.
 **Standalone prompt files.** Some chunks have a fuller ready-to-run prompt kept as
 its own file (`T3_PROMPT.md`, `T4_PROMPT.md`, `T5_PROMPT.md`, `D2_PROMPT.md`,
 **`P0_PROMPT.md`**, **`P0B_PROMPT.md`**, **`S0A_PROMPT.md`**, **`H2_PROMPT.md`**,
-**`P2_PROMPT.md`**, **`P5_PROMPT.md`** — the
+**`P2_PROMPT.md`**, **`P5_PROMPT.md`**, **`P6_PROMPT.md`** — the
 first added 2026-08-30 after it was missing from this list while P0 ran, which is the
 same "a prompt that exists only on one machine cannot be handed to anything" failure
 CHARTER §6.7 names; the latter three added the same day **at creation time**, which is
@@ -252,7 +283,9 @@ the practice that failure was supposed to teach — `H2_PROMPT.md` created 2026-
 before H2 was started. **`P2_PROMPT.md` added 2026-09-04 — retroactively, after P2
 had already run, which is the same omission this list exists to prevent and the
 third time it has happened. The prompt file existed; it was simply never inventoried
-here.** `P5_PROMPT.md` added 2026-09-04 **at creation time, before P5 was
+here.** `P6_PROMPT.md` added 2026-09-04 at creation time, before P6 was started —
+**the second consecutive chunk for which this list was maintained rather than
+repaired afterwards.** `P5_PROMPT.md` added 2026-09-04 **at creation time, before P5 was
 started** — the practice §6.7 teaches, and now also enforced by `check_docs.py`).
 Where one exists,
 **that file is authoritative** and the section here is a summary. Paste the file,
@@ -318,9 +351,10 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 | `[ ]` | **P0c** Decode `PublishedData`           | P0         | **NEW 2026-08-30. Cheap, and it is server→client state.** Base64 + zlib (`eNr…`) blobs in `Characters[]` of the `getlogininfo` response — a response we can **already read**, no keys and no new capture needed. FIND-3, STATE §16.3 |
 | `[ ]` | **P1** Handshake sequence                 | ~~T5~~ **T5 done**, ~~H3~~ **S1a or H3** | The connect exchange, byte-documented. **Scope narrowed — the epoch-0 DTLS half is already byte-documented in STATE §12B; what remains is the GridMate `Carrier` handshake inside epoch ≥ 1.** Reachable from S1a's plaintext for the client→server half without H3 |
 | `[x]` | **P2** ~~Message-type census~~ **Protobuf descriptor extraction (static)** | ~~H3~~ ~~**H2, or S1a, or FIND-2**~~ **H2 (done)** | **DONE 2026-09-04. VERDICT: NEGATIVE — and the negative is the deliverable. STATE §17.9.** Whole-binary scan found **3 `FileDescriptorProto` blobs, none of them game protocol**: `campfire_event_default.proto` (Amazon Campfire telemetry — 1 message, 1 nested context struct, 1 enum), plus stock `google/protobuf/empty.proto` and `google/protobuf/descriptor.proto`. **No Javelin descriptor. No `service` block. `application/x-protobuf` = 0 against `application/json` = 236.** **All three predictions in `P2_PROMPT.md` falsified**, including prediction 3 ("the single most valuable find P2 can make"). Consequences: **FIND-2 closed negative**; **§17.5's "protobuf choke point" corrected** (STATE §13); **OI-H2-3 answered mundanely** — AWS SDK `XResult` types are non-polymorphic, so no vtable and no RTTI, not an exotic inbound path; **Track P retargeted onto GridMate `ReplicaChunk` marshalling → see P5**. Residual: **OI-P2-1** (registration mechanism unconfirmed — the one definition-of-done bullet not satisfied), **OI-P2-2** (are the 10 Javelin types the same REST routes P0 decoded?). Tests #63–#65. ~~The dispatch table as a list of known types. **Dependency corrected 2026-08-30** — H2's static table and FIND-2's protobuf descriptors both reach this without H3.~~ **Note the rename: the message-type census was performed by H2 (§17.5), not by P2.** Prompt: `P2_PROMPT.md` |
-| `[ ]` | **P3** Position/movement message          | ~~H3~~ **S1a or H3**, P2 | The controlled-walk experiment, decoded. Outbound position messages arrive as plaintext at an S1a server; H3 only adds the inbound half |
+| `[ ]` | **P6** Hub message layer — type vocabulary and fragment wire format | T1, H2, P2, P5 | **← THE TRACK P FRONT, opened 2026-09-04 by P5 (STATE §18).** `Amazon::Hub` is Amazon's own replication framework, above GridMate, using it for transport only. **Step 1 resolves OI-P5-1:** `FUN_1407fbe00` caches a 16-byte `AZ::Uuid` hashed from `DAT_147f42168` — the string **after** the type name. If `FUN_1413e84b0` is `Uuid::CreateName`, the **~3,600-type wire vocabulary computes offline** from names already in the symbol dump; if `Uuid::CreateString`, ~3,600 literals must be extracted. The 3-arg/`0`-length call shape points at `CreateString`. Also: confirm the vftable layout is uniform (OI-P5-4 — everything in §18.3 rests on **one** worked example), frame `FragmentUpdateMsg` end to end, and establish **which of the three `RegistrationRequest` revisions b22469132 sends** (the most S1a-actionable part). **Static, source + Ghidra, no capture, no client, no deadline, immune to the 2027-01-31 sunset.** Hard boundary: `EasyAntiCheatClientTrait` and `EOSAntiCheatClientTrait` appear in the Hub type list — **in scope only as names in a vocabulary; do not trace, do not decompile** (CHARTER §3). Prompt: `P6_PROMPT.md` |
+| `[ ]` | **P3** Position/movement message          | ~~H3~~ **S1a or H3**, P2 | The controlled-walk experiment, decoded. Outbound position messages arrive as plaintext at an S1a server; H3 only adds the inbound half. **CORRECTED 2026-09-04 (P5, STATE §13):** look for a smoothly varying **raw float triple** — GridMate's default transform marshalers do **not** quantize. Whether New World opts into compression per DataSet is **OI-P5-3** |
 | `[ ]` | **P4** Initial world-state sync           | **H3**, P2 | The login state dump. **Genuinely needs H3** — this one is server→client, the direction S1a cannot observe. Expect to construct rather than capture it |
-| `[ ]` | **P5** Replica/chunk model                | ~~T1, H4~~ **T1 — source-readable now** | **PROMOTED 2026-09-04 to the Track P front, by P2's negative result (STATE §17.9).** How replicated objects map to the wire. **P2 ruled protobuf out**, and the world stream is GridMate `ReplicaChunk` marshalling (`ReplicaChunk` 23, `InitializeReplicatedFields` 94, plus §10's `VTransformReplicaChunk` / `VTriggerAreaReplicaChunk` / `ScriptComponentReplicaChunk`). **We hold the source for it** — the fork at `7d4f1ee6`, which already builds. **Dependency corrected: H4 is an accelerator, not a gate.** Reading `Marshaler` / `DataSetBase` / `CompressionMarshal.h` / `MathMarshal.h` in the fork needs no reflection reader, no capture, and no running client. **CHARTER §2 paying off: on this layer the reference build is not merely the check, it is the primary source.** Immune to the 2027-01-31 sunset. Chunk types are identified on the wire by `AZ::Crc32` of the chunk name. **Prompt written 2026-09-04 at creation time: `P5_PROMPT.md`.** Its **prediction 0 targets the chunk's own premise** — that the world stream carries replica traffic at all — because P2's three predictions shared one unstated premise and could not fail independently. Live strain it must resolve: H2 mapped `OnRecv → JavelinGatewayService` (§17.4) and P2 proved that layer is **JSON**, so either REP carries both or replica traffic rides another path (related: OI-H2-1) |
+| `[x]` | **P5** Replica/chunk model | ~~T1, H4~~ **T1** | **DONE 2026-09-04 — COMPLETE, with a redirect larger than the chunk. STATE §18.** GridMate's replica wire format is documented from the pin (envelope; **`PackedSize` is bit-granular, and every length in the envelope is a BIT count**; GridMate's VLQ is **not** protobuf's varint; chunk ids are `AZ::Crc32`; DataSets are dirty-bit gated) — **but it is not where the game's state lives.** P5 found a **third layer: `Amazon::Hub`**, Amazon's own actor/fragment replication framework above GridMate, **3,629 symbols and zero functions**, entirely inlined. Game state is Hub fragments; the inbound world-state update is **`ReplicateClient::FragmentUpdateMsg`**; the world handshake is enumerated by name — `REPClient::RegistrationRequestMsg`/`V2Msg`/`V3Msg`, `RegistrationResponseMsg`, `PingMsg`, `TimeSynchMsg`, plus `REPConnectionListener::ClientConnection`/`DisconnectionMsg`. **Prediction 1 and 2 confirmed; prediction 3 FALSIFIED** — transforms are **raw IEEE floats** (12 B per Vector3, 48 B per Transform), quantization is opt-in per DataSet, which corrects the P3 note below (STATE §13). **Prediction 0 asked the wrong question** — see the eighth amendment. **Also corrects P2's §17.9** on `InitializeReplicatedFields`. Residuals **OI-P5-1…4**; **OI-P5-1 is the highest-value open question on the board.** Tests #66–#68. → **P6.** ~~**PROMOTED 2026-09-04 to the Track P front, by P2's negative result (STATE §17.9).** How replicated objects map to the wire. **P2 ruled protobuf out**, and the world stream is GridMate `ReplicaChunk` marshalling (`ReplicaChunk` 23, `InitializeReplicatedFields` 94, plus §10's `VTransformReplicaChunk` / `VTriggerAreaReplicaChunk` / `ScriptComponentReplicaChunk`).~~ **That framing was wrong twice over: `InitializeReplicatedFields` is a Hub symbol, not GridMate's, and the world stream is Hub.** Prompt: `P5_PROMPT.md` |
 
 ### Track S — Server. Speak back to the client.
 
@@ -449,8 +483,14 @@ get pursued or recorded.
    protocol; no Javelin schema, no `service` block. **FIND-2 closed negative**;
    §17.5 corrected; OI-H2-3 answered. **Track P retargets onto P5** (GridMate
    `ReplicaChunk` marshalling, source-readable from the fork).
-4a. **P5** — replica/chunk model. **The new Track P front**, promoted by item 4's
-   negative result. Read the fork's marshalers; no capture, no client, no H4.
+4a. ~~**P5** — replica/chunk model. **The new Track P front**, promoted by item 4's
+   negative result. Read the fork's marshalers; no capture, no client, no H4.~~
+   **DONE 2026-09-04, STATE §18.** Format documented — **and it is not where game
+   state lives.** Found a third layer, **`Amazon::Hub`**, above GridMate. Prediction 3
+   falsified (raw floats, not quantized). Corrects P2's §17.9. → **P6.**
+4b. **P6** — the Hub message layer. **The Track P front.** Recover the ~3,600-type
+   name↔UUID vocabulary, frame `ReplicateClient::FragmentUpdateMsg`, and pin down
+   which `RegistrationRequest` revision the client sends. Static, no deadline.
 5. **P0c** — decode `PublishedData` (FIND-3). Cheap, no capture, server→client state.
 6. **S0** — redirection feasibility. ~~**Unblocks once P0b lands.**~~ **UNBLOCKED.**
    Requirements in **STATE §16.13**, revised from §16.6. Proxy the queue endpoint, not
@@ -474,14 +514,18 @@ survives contact. Running it first may save S0 an entire wasted iteration, and i
 warms H2's instrument either way.~~ ~~**Next is H2** (static Ghidra, now warm from S0a —
 scope it ambitiously) **or S0** (design the field-rewrite proxy on the small branch,
 carrying OPEN-3R). Both file-based, no deadline.~~ **Superseded 2026-09-04 — H2 and
-P2 are both done (STATE §17, §17.9).** **Next is P5** (read the fork's `ReplicaChunk`
+P2 are both done (STATE §17, §17.9).** ~~**Next is P5** (read the fork's `ReplicaChunk`
 marshalers — the Track P front now that protobuf is ruled out, and the cheapest
 unexplored source of protocol structure on the board) **or S0** (design the
 field-rewrite proxy) **or P0c** (decode `PublishedData`, FIND-3 — still the cheapest
 server→client state we can already read). **OI-P2-2 is cheaper than any of them and
 could force another correction**: diff the 10 Javelin type names against `p0_cold`'s
 routes; if they match, §17.5's "world message layer" framing is wrong too and the
-inbound Javelin schema was already in P0's captures. **S0 has no perishable thread left** — OPEN-3 was closed
+inbound Javelin schema was already in P0's captures.~~ **Superseded 2026-09-04 —
+P5 is done (STATE §18).** **Next is P6** (the Hub message layer — recover the
+~3,600-type wire vocabulary; step 1 alone decides whether that is a computation or
+an extraction). **OI-P2-2 remains the cheapest item on the board** and could still
+force another §13 correction. **S0** and **P0c** are unchanged and unblocked. **S0 has no perishable thread left** — OPEN-3 was closed
 statically, so S0 needs no live-backend confirmation to commit to its design.
 
 **What this order does not yield** is the server→client direction in captured form.
@@ -1192,11 +1236,39 @@ Write the full prompt when the chunk comes up, using the shape above.
   source to the sample*), then confirm against the retail binary's 23 `ReplicaChunk`
   and 94 `InitializeReplicatedFields` references (STATE §10, §17.9). **No capture, no
   client, no hook, no deadline** — the strongest position the project has had on the
-  inbound half. Note P3 depends on this: GridMate's transform marshalers **quantize**,
-  so a raw float triple is the wrong thing to look for. **Noticed during D2:**
+  inbound half. ~~Note P3 depends on this: GridMate's transform marshalers
+  **quantize**, so a raw float triple is the wrong thing to look for.~~
+  **CORRECTED 2026-09-04 (STATE §13, §18.4): the default `Marshaler<AZ::Vector3>`
+  writes three RAW IEEE floats (12 bytes) and `Marshaler<AZ::Transform>` 48 bytes
+  uncompressed. Quantization is opt-in per DataSet. P3 should look for a raw float
+  triple after all.** ~~confirm against the retail binary's 23 `ReplicaChunk` and 94
+  `InitializeReplicatedFields` references~~ — **the 94 are Hub symbols, not
+  GridMate's; that cross-check was invalid (STATE §13).** **DONE 2026-09-04 — see
+  STATE §18 and the P6 stub below.** **Noticed during D2:**
   `object-stream-converter` and `asset-catalog-parser` in the new-world-tools kit
   would likely say a lot about the replicated-object model. Recorded, not acted on.
   STATE §11.
+
+- **P6 Hub message layer. ← THE TRACK P FRONT, opened 2026-09-04 by P5 (STATE
+  §18).** `Amazon::Hub` is a **third** replication layer — not GridMate replicas,
+  not Javelin JSON — carrying every `MB::*ReplicatedState` and
+  `Javelin::*ReplicatedState` as a fragment. It is **entirely inlined**: 3,629
+  symbols, **zero functions**, so RTTI descriptors and name strings are the only
+  doors in. **Step 1 is OI-P5-1** and decides the shape of everything after it:
+  whether the ~3,600-type name↔UUID map is a **computation** (`Uuid::CreateName`,
+  from names we already hold) or an **extraction** (`Uuid::CreateString`, ~3,600
+  literals out of scattered `.rdata`). Then: confirm vftable uniformity against a
+  second type (**OI-P5-4** — §18.3 is one worked example and nothing more), frame
+  `ReplicateClient::FragmentUpdateMsg`, and settle **which `RegistrationRequest`
+  revision b22469132 sends** — three exist and the client uses one. **That last
+  item is what S1a needs first**; prefer it if the chunk runs long. Landmarks:
+  vftable `0x147f42110`, identity `FUN_1407fbe00`, hash `FUN_1413e84b0`, inlined
+  hook body `FUN_1407f3720`, descriptor block from `14a1340c0`. **Hard boundary:
+  the Hub type list contains `EasyAntiCheatClientTrait` and `EOSAntiCheatClientTrait`
+  — in scope only as names in a vocabulary. Do not trace them, do not decompile
+  them, stop if a trace wanders that way (CHARTER §3).** Scope bound: Hub also
+  contains actor migration, persistence, routing, phasing and AOI subsystems —
+  **noticed, not pursued.** Prompt: `P6_PROMPT.md`. STATE §18.
 - **S1–S3.** Server work, all blocked on the corresponding P-track chunks. Prompts
   when P1/P3/P4 resolve. Content source is ready (D2). **T5 handed S-track three
   hard requirements and removed one (STATE §12B):** the server must run GridMate's
