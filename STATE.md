@@ -9,7 +9,7 @@
 | Section count (every `## ` header, this one included) | **21** (§16.15 and §17.9 are `###` subsections; **§18 is a new `## ` added by P5**) |
 | Highest test number (§14) | **68** |
 | Correction row count (§13) | **31** |
-| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, P2, P5, P6 |
+| Chunks complete | T1, T2, T3, T4, T5, D2, P0, P0b, S0a, H2, P2, P5 |
 | Open gates | **0** — **OPEN-3 RESOLVED 2026-08-31** (NO, confirmed by direct trace of the deserializer; client does not verify the queue token; S0a, §16.15). **OPEN-3R closed same session.** GATE-1 resolved 2026-08-30 (§3, §15). |
 
 **A session's first action is to check these against the working tree.** Not to
