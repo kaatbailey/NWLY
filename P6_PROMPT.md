@@ -1,5 +1,16 @@
 # P6 — The Hub message layer: type vocabulary and fragment wire format
 
+> **DONE (PARTIAL) 2026-09-05 — STATE §19.**
+> Steps 1, 2, 3 and 5 complete; **Step 4 not started**.
+> OI-P5-1 answered (`CreateString` — extraction, not computation).
+> OI-P5-4 answered (vftable layout NOT uniform; §18.3 restated single-instance).
+> Vocabulary: **3,509 Hub identities**, 311 named / 3,199 anonymous **by design**.
+> Handshake set enumerated with UUIDs, hooks and handler tables — §19.6.
+> Successor open items: **OI-P6-1 … OI-P6-5** (§15). Step 4 is OI-P6-3.
+> **Two claims in this file were falsified before the work began — struck through
+> below. Do not act on the struck text.**
+
+
 **Read `CHARTER.md` and `STATE.md` first. This file is the chunk; those two are
 the context. Do not act on a summary of either.**
 
@@ -46,12 +57,17 @@ FUN_1413e84b0(local_18, &DAT_147f42168, 0)
 terminator). So the input is the string *following* the type name.
 
 1. **Read `DAT_147f42168`.** Goto it in the Listing. Is it a name string, or a
-   literal `"{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"`?
+   literal ~~`"{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"`~~ **— brace-delimited is
+   NOT the universal form. Both braced and unbraced literals exist and both are
+   parsed; `ReplicateClient` is unbraced. §19.2, §13.**
+   **ANSWERED: a literal, `6bb22ea1-feb6-4f4b-81ab-79372b9f1f3d`.**
 2. **Decompile `FUN_1413e84b0`.** Compare against `AZ::Uuid::CreateString` and
    `AZ::Uuid::CreateName` in the fork
-   (`dev/Code/Framework/AzCore/AzCore/Math/Uuid.*`). CreateName is MD5 over the
-   name; CreateString parses hex with brace/dash handling. **They look nothing
-   alike** — a few lines of decompiler output should settle it.
+   (`dev/Code/Framework/AzCore/AzCore/Math/Uuid.*`). ~~CreateName is MD5 over the
+   name~~ **— FALSE: `CreateName` is SHA-1 (`Uuid.cpp:285` → `CreateData` `:293–322`,
+   `Sha1.h` at `:15`, version nibble `0x50`). `VER_NAME_MD5` is decode-only.
+   §19.2, §13.** CreateString parses hex with brace/dash handling. **They look
+   nothing alike** — a few lines of decompiler output should settle it.
 
 | Outcome | What P6 becomes |
 |---|---|
@@ -62,7 +78,7 @@ terminator). So the input is the string *following* the type name.
 
 ---
 
-## Step 2a — build the map by computation
+## ~~Step 2a — build the map by computation~~ **DEAD — `CreateString`, not `CreateName`.**
 
 Implement `Uuid::CreateName` from the fork source, verify it reproduces the
 cached 16 bytes at `_DAT_14a2e7750` for `ReplicateClient`, **then** run it over
@@ -70,7 +86,13 @@ the full name list. **Verify against a second and third type before trusting the
 bulk output** (CHARTER §4 — a belief validated only against your own tooling is
 not validated).
 
-## Step 2b — build the map by extraction
+## Step 2b — build the map by extraction **— DONE, but not as written**
+
+> The `.rdata` scan described below is **not** how the map was built. Hub types
+> register through `FUN_1407de270` with the UUID parse **inlined**, so they have
+> no `CreateString` call site. Walking `CreateString` yields the engine's
+> `AZ_TYPE_INFO` map (5,907 types) which does **not** contain the session layer.
+> See §19.3–19.5. Three dead routes recorded in §19.8 — do not retry them.
 
 Scan `.rdata` for the UUID-literal pattern; pair each with the nearest preceding
 name string. **Verify the pairing rule on `ReplicateClient` and `REPClient`

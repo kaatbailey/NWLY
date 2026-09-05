@@ -1,5 +1,19 @@
 # T3 — Transport recon (retail, capture only, no hooks)
 
+> # ✅ DONE — 2026-08-29. VERDICT: COMPLETE.
+> **Findings folded into `STATE.md` §12A. Read that, not this.**
+>
+> **World transport is UDP/DTLS 1.2 via `SecureSocketDriver`** — which settles the
+> `SecureSocketDriver` vs `StreamSecureSocketDriver` question §7 flagged as
+> UNVERIFIED-for-retail. **P1–P4 all confirmed**, including the load-bearing P4: the
+> retail ClientHello advertises **exactly one cipher suite, `0xC030`**, as GridMate
+> hardcodes at `SecureSocketDriver.cpp:1494`. The epoch-0 handshake was saved as its
+> own pcap and became T5's diff input.
+>
+> Nothing in this prompt was falsified. The `-d udp.port==$GAMEPORT,dtls` warning in
+> step 6 proved necessary — the heuristic dissector does not claim the port on its
+> own, and without it a correct capture reads as "P2 falsified."
+
 > You have been given `CHARTER.md` and `STATE.md`. Work **only** this chunk. If you
 > find something that belongs to another chunk, record it in FINDINGS under
 > "Noticed, out of scope" and do not act on it.

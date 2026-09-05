@@ -1,5 +1,29 @@
 # H2 — Map the inbound world-message path and its dispatch
 
+> # ✅ DONE — 2026-09-04. VERDICT: COMPLETE.
+> **Findings folded into `STATE.md` §17. Read that, not this.**
+>
+> **The inbound path resolved end to end:** `WSARecvFrom → TransportLayerLibUV →
+> TransportLayerGridMate → REPConnection::OnConnect/OnRecv →
+> Aws::JavelinGatewayService`. **Stock/game boundary is `REPConnection`.**
+> **Prediction 2 confirmed** — dispatch is registration-based, not a switch. 10
+> Javelin Gateway message types enumerated by RTTI; the `GameConnection` state table
+> complete at all 15 states. Opened **OI-H2-1…5**.
+>
+> **Prediction 1 strained, not falsified.** LibUV wraps the socket layer, which
+> T5/§12B's "zero catalogued exceptions" wording did not anticipate — a precision gap
+> in the Carrier-vs-transport distinction (§17.1, OI-H2-1).
+>
+> ~~**Step 4 — where protobuf enters (FIND-2).**~~ **FALSIFIED by P2 the same day.**
+> There is no protobuf choke point on this path and no protobuf near the Javelin
+> models: the whole binary holds **3** `FileDescriptorProto` blobs, all telemetry or
+> stock, and `application/x-protobuf` = 0 against `application/json` = 236. **The
+> Javelin layer is JSON.** §17.9, §13. Prediction 3 falsified with it.
+>
+> Also superseded: §17.5's "protobuf choke point" hand-off to P2, and §17.9's
+> attribution of `InitializeReplicatedFields` to GridMate — it is an `Amazon::Hub`
+> symbol (P5, §18, §13). Struck, never deleted (CHARTER §5).
+
 **Read `CHARTER.md` and `STATE.md` first. This file is the chunk; those two are the
 context. Do not act on a summary of either.**
 

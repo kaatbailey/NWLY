@@ -1,5 +1,40 @@
 # T5 — Reference vs retail handshake diff (the milestone verdict)
 
+> # ✅ DONE — 2026-08-29. VERDICT: THE MILESTONE — the charter's core question is answered.
+> **Findings folded into `STATE.md` §12B. Read that, not this.**
+>
+> **Retail transport is structurally stock GridMate `SecureSocketDriver`, with zero
+> catalogued exceptions.** Every handshake difference between retail (b22469132) and
+> the reference (`7d4f1ee6`) is attributable to **OpenSSL 1.1.1k vs 3.6.4 defaults**
+> in fields `SecureSocketDriver.cpp` does not set. **The reference build is a valid
+> instrument for retail's transport** — CHARTER §2's fork-or-rewrite question,
+> answered. **§12B is the section that licenses the rest of the project.**
+>
+> **P1 CONFIRMED** — every GridMate-controlled field matches; the extension type
+> list is character-identical (`11,10,35,22,23,13`); the **HelloRequest is
+> byte-identical**, 25 bytes.
+> **P2 CONFIRMED** — four divergences (RFC 5746 SCSV-vs-extension, sigalgs, curve
+> order, `ec_point_formats`), all library noise, none in a field the source sets;
+> they fully account for the 146-vs-141 ClientHello length difference with no
+> residual.
+> **P3 CONFIRMED** — mutual auth is **stock GridMate, not Amazon-added** — and it
+> rests on a **bug in Amazon's source**: `SecureSocketDriver.cpp:1522`–`1525`
+> assigns `SSL_VERIFY_FAIL_IF_NO_PEER_CERT` instead of OR-ing it, so `0x02 & 0x01
+> == 0` and the branch is inverted against its own comment. The default path sends
+> CertificateRequest and accepts an empty cert; the `authenticateClient` path turns
+> verification off. **S-track must reproduce the default behaviour, bug included.**
+> **P4 CONFIRMED** — one parse path, both flights.
+>
+> **Three hard requirements handed to S-track** (§12B): GridMate's own 20-byte
+> cookie exchange at the datagram layer, HelloRequest after cookie verify, and
+> CertificateRequest with an empty client cert accepted.
+>
+> **Precision note added 2026-09-04 by H2 (§17.1, OI-H2-1):** the socket layer is
+> **LibUV-wrapped** (`TransportConnectionLibUV`), which this chunk's "zero
+> catalogued exceptions" wording did not anticipate. That is a **precision gap in
+> the Carrier-vs-transport distinction, not a falsification** — §12B's verdict
+> concerns the Carrier and crypto layers and stands. Strained, not struck.
+
 > You have been given `CHARTER.md` and `STATE.md`. Work **only** this chunk. If you
 > find something that belongs to another chunk, record it in FINDINGS under
 > "Noticed, out of scope" and do not act on it.

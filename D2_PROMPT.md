@@ -1,5 +1,16 @@
 # D2 — Client game-data extraction (`.datasheet`)
 
+> # ✅ DONE — 2026-08-29. VERDICT: COMPLETE.
+> **Findings folded into `STATE.md` §11. Read that, not this.**
+>
+> **2,250 datasheets extracted to JSON.** The pipeline was proved on a single sheet
+> before bulk extraction, as this prompt requires, and the bulk run was inventoried.
+> Extracted content is **not** committed — `.gitignore` covers the paks and the
+> extracted trees (CHARTER §3).
+>
+> Nothing in this prompt was falsified. Track S has its content source; D2 is not a
+> dependency of any Track T/H/P chunk and does not need revisiting.
+
 *Paste order for the session: `CHARTER.md`, then `STATE.md`, then this prompt.
 D2 has no chunk dependencies and takes no upstream FINDINGS block as input.*
 

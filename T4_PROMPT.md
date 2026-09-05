@@ -1,5 +1,22 @@
 ## T4 — Build the reference `Carrier` from the fork
 
+> # ✅ DONE — 2026-08-29. VERDICT: COMPLETE — all five steps.
+> **Findings folded into `STATE.md` §7–§9. Read that, not this.**
+>
+> **Both modes pass and are captured:** `carrier_probe` (plaintext) and
+> `carrier_probe --secure` (DTLS 1.2). The `Carrier` header layout is confirmed from
+> source against the plaintext capture. **This is the reference instrument the whole
+> project leans on** (CHARTER §2), and T5 validated it as such.
+>
+> ~~Step 5's predicted Linux-path bugs on the DTLS path.~~ **They did not exist** —
+> the secure path worked once `-DDTLS1_RT_HEARTBEAT=24` and the secure trait were
+> defined. §13.
+>
+> Two decisions closed here and not to be reopened: **OpenSSL 3.x is not a blocker**
+> (0 errors, 3 deprecation warnings), and **`/opt/llvm14` is not needed** — the source
+> is C++17, not C++14, and system clang handles it with `-include utility
+> -fdelayed-template-parsing`. Tests #1–#3, #5–#16.
+
 **Paste order for this session:** `CHARTER.md`, then `STATE.md`, then this prompt.
 
 > You have been given `CHARTER.md` and `STATE.md`. Work **only** this chunk. If you

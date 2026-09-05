@@ -1,5 +1,32 @@
 # P5 — The replica/chunk model: how world state reaches the wire
 
+> # ✅ DONE — 2026-09-04. VERDICT: COMPLETE, with a redirect larger than the chunk.
+> **Findings folded into `STATE.md` §18. Read that, not this.**
+>
+> **GridMate's replica wire format is documented** from the pin — envelope layout;
+> **`PackedSize` is bit-granular and every length in the envelope is a BIT count**;
+> GridMate's VLQ is **not** protobuf's varint; chunk ids are `AZ::Crc32`; DataSets are
+> dirty-bit gated. **Predictions 1 and 2 confirmed.**
+>
+> **But it is not where the game's state lives.** P5 found a **third layer above
+> GridMate — `Amazon::Hub`**, Amazon's own actor/fragment replication framework,
+> **3,629 symbols and zero functions**, entirely inlined. Game state is Hub fragments.
+> → **P6** (§19), which recovered the Hub vocabulary and registration mechanism.
+>
+> ~~**3. Transform/position values are quantized, not raw IEEE floats.**~~
+> **FALSIFIED.** `Marshaler<AZ::Vector3>` writes three **raw IEEE floats** (12 bytes)
+> and `Marshaler<AZ::Transform>` four of those (**48 bytes, uncompressed**) —
+> `Serialize/MathMarshal.h:59,186` at `7d4f1ee6`. Quantizing marshalers exist but are
+> **opt-in per DataSet**. **This corrects the P3 note in `CHUNKS.md`** — P3 should
+> search for a smoothly varying raw float triple after all. Whether New World opts in
+> per-DataSet is **OI-P5-3**. §13, §18.4.
+>
+> **Prediction 0 asked the wrong question.** It enumerated only two answers — the
+> world stream is `ReplicaChunk` or it is not — and reality was a third layer neither
+> option named. That lesson is written into P6's prediction 0 and was vindicated
+> there. Residuals **OI-P5-1…4**; OI-P5-1 and OI-P5-4 both answered by P6 (§19).
+> Tests #66–#68.
+
 **Read `CHARTER.md` and `STATE.md` first. This file is the chunk; those two are
 the context. Do not act on a summary of either.**
 
